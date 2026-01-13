@@ -3,11 +3,9 @@
 import Image from "next/image";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useEffect, useMemo, useState } from "react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 import { Icon } from "../components/Icon";
-
-export const dynamic = 'force-dynamic';
 
 type Theme = 'light' | 'dark' | 'auto';
 
