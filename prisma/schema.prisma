@@ -1,0 +1,107 @@
+// Prisma schema for household task planner
+// PostgreSQL for production
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model User {
+  id              String            @id @default(cuid())
+  email           String            @unique
+  name            String
+  passwordHash    String
+  points          Int               @default(0)
+  memberships     Membership[]
+  unavailables    Unavailability[]
+  assignments     Assignment[]
+  registrations   TaskRegistration[]
+  validations     TaskValidation[]
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+}
+
+model Family {
+  id           String         @id @default(cuid())
+  name         String
+  code         String?        @unique @default(cuid())
+  createdAt    DateTime       @default(now())
+  members      Membership[]
+  tasks        Task[]
+}
+
+model Membership {
+  id          String  @id @default(cuid())
+  role        String  @default("member")
+  userId      String
+  familyId    String
+  color       String  @default("#3b82f6")
+  calendarUrl String?
+  participatesInLeaderboard Boolean @default(true)
+
+  user   User   @relation(fields: [userId], references: [id])
+  family Family @relation(fields: [familyId], references: [id])
+}
+
+model Task {
+  id            String            @id @default(cuid())
+  title         String
+  duration      Int
+  penibility    Int
+  slot          String
+  frequency     String
+  familyId      String
+  family        Family            @relation(fields: [familyId], references: [id])
+  assignments   Assignment[]
+  registrations TaskRegistration[]
+  validations   TaskValidation[]
+  createdAt     DateTime          @default(now())
+}
+
+model Assignment {
+  id        String @id @default(cuid())
+  taskId    String
+  userId    String
+  task      Task   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User   @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+// Inscription d'un utilisateur à une tâche pour une date spécifique
+model TaskRegistration {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  date      String   // Format YYYY-MM-DD
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, date]) // Une seule personne peut s'inscrire par tâche/date
+}
+
+// Validation d'une tâche effectuée
+model TaskValidation {
+  id        String   @id @default(cuid())
+  taskId    String
+  userId    String
+  date      String   // Format YYYY-MM-DD
+  validated Boolean  @default(true)
+  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id])
+  createdAt DateTime @default(now())
+
+  @@unique([taskId, date]) // Une seule validation par tâche/date
+}
+
+model Unavailability {
+  id      String @id @default(cuid())
+  userId  String
+  slot    String
+  user    User   @relation(fields: [userId], references: [id])
+}
