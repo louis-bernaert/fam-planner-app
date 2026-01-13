@@ -41,8 +41,6 @@ export async function POST(request: Request) {
     const cleanUser = {
       id: user.id,
       name: user.name,
-      firstName: user.firstName,
-      lastName: user.lastName,
       email: user.email,
       familyIds: user.memberships.map((m) => m.familyId),
       points: user.points,
