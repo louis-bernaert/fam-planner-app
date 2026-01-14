@@ -214,6 +214,17 @@ export default function PlannerPage() {
   const [pointsHistoryModal, setPointsHistoryModal] = useState<{ userId: string; userName: string } | null>(null);
   const [showQuotaExplain, setShowQuotaExplain] = useState(false);
 
+  // View mode state (desktop/mobile app)
+  const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('viewMode');
+      if (saved === 'mobile' || saved === 'desktop') return saved;
+      // Auto-detect on first load
+      return window.innerWidth < 768 ? 'mobile' : 'desktop';
+    }
+    return 'desktop';
+  });
+
   // Theme state
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
@@ -234,6 +245,17 @@ export default function PlannerPage() {
     }
   }, [theme]);
 
+  // Persist viewMode to localStorage and apply class
+  useEffect(() => {
+    localStorage.setItem('viewMode', viewMode);
+    const root = document.documentElement;
+    if (viewMode === 'mobile') {
+      root.setAttribute('data-view', 'mobile');
+    } else {
+      root.removeAttribute('data-view');
+    }
+  }, [viewMode]);
+
   // Persist weeklyHistory to localStorage whenever it changes
   useEffect(() => {
     if (weeklyHistory.length > 0) {
@@ -242,11 +264,11 @@ export default function PlannerPage() {
   }, [weeklyHistory]);
 
   const tabs = [
-    { id: "monespace" as const, label: "Mon Espace" },
-    { id: "planificateur" as const, label: "Planificateur" },
-    { id: "points" as const, label: "Compteur de points" },
-    { id: "taches" as const, label: "Tâches" },
-    { id: "dispos" as const, label: "Calendrier" },
+    { id: "monespace" as const, label: "Mon Espace", shortLabel: "Accueil", icon: "home" as const },
+    { id: "planificateur" as const, label: "Planificateur", shortLabel: "Planning", icon: "calendarAlt" as const },
+    { id: "points" as const, label: "Compteur de points", shortLabel: "Points", icon: "chartBar" as const },
+    { id: "taches" as const, label: "Tâches", shortLabel: "Tâches", icon: "clipboardList" as const },
+    { id: "dispos" as const, label: "Calendrier", shortLabel: "Agenda", icon: "calendar" as const },
   ];
 
   // Calendar functions
@@ -2353,22 +2375,35 @@ export default function PlannerPage() {
   const currentUserEntity = users.find((u) => u.id === currentUser);
 
   return (
-    <main className={styles.shell}>
+    <main className={`${styles.shell} ${viewMode === 'mobile' ? styles.mobileApp : ''}`}>
       <header className={styles.topbar}>
         <div className={styles.brandSection}>
           <img 
             src="/logo/logo_sans_nom.svg" 
             alt="Fam'Planner" 
             className={styles.logo}
-            width={88}
-            height={88}
+            width={viewMode === 'mobile' ? 40 : 88}
+            height={viewMode === 'mobile' ? 40 : 88}
           />
-          <div>
-            <h1 className={styles.brandTitle}>Fam'Planner</h1>
-            <p className={styles.brandSubtitle}>Organisation familiale</p>
-          </div>
+          {viewMode === 'desktop' && (
+            <div>
+              <h1 className={styles.brandTitle}>Fam'Planner</h1>
+              <p className={styles.brandSubtitle}>Organisation familiale</p>
+            </div>
+          )}
+          {viewMode === 'mobile' && (
+            <h1 className={styles.mobileTitle}>{tabs.find(t => t.id === activeTab)?.shortLabel}</h1>
+          )}
         </div>
         <div className={styles.topActions}>
+          <button 
+            className={styles.viewToggle}
+            onClick={() => setViewMode(viewMode === 'desktop' ? 'mobile' : 'desktop')}
+            title={viewMode === 'desktop' ? 'Passer en mode Application' : 'Passer en mode Bureau'}
+          >
+            <Icon name={viewMode === 'desktop' ? 'mobileAlt' : 'desktop'} size={18} />
+            {viewMode === 'desktop' && <span className={styles.viewLabel}>App</span>}
+          </button>
           <button 
             className={styles.themeToggle} 
             onClick={() => {
@@ -2378,27 +2413,29 @@ export default function PlannerPage() {
             title={`Thème: ${theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}`}
           >
             <Icon name={theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'circleHalfStroke'} size={18} />
-            <span className={styles.themeLabel}>{theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}</span>
+            {viewMode === 'desktop' && <span className={styles.themeLabel}>{theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}</span>}
           </button>
           <Link href="/settings" className={styles.settingsLink} title="Paramètres">
             <Icon name="gear" size={18} />
           </Link>
-          {currentUserEntity && <span className={styles.userChip}>{currentUserEntity.name}</span>}
-          <button className={styles.logout} onClick={logout}>Se déconnecter</button>
+          {currentUserEntity && viewMode === 'desktop' && <span className={styles.userChip}>{currentUserEntity.name}</span>}
+          {viewMode === 'desktop' && <button className={styles.logout} onClick={logout}>Se déconnecter</button>}
         </div>
       </header>
 
-      <nav className={styles.tabbar}>
-        {tabs.map((tab) => (
-          <button
-            key={tab.id}
-            className={activeTab === tab.id ? styles.tabButtonActive : styles.tabButton}
-            onClick={() => setActiveTab(tab.id)}
-          >
-            {tab.label}
+      {viewMode === 'desktop' && (
+        <nav className={styles.tabbar}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={activeTab === tab.id ? styles.tabButtonActive : styles.tabButton}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              {tab.label}
           </button>
         ))}
       </nav>
+      )}
 
       {activeTab === "monespace" && (
         <section className={styles.tabPanel}>
@@ -3949,6 +3986,22 @@ export default function PlannerPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* Mobile Bottom Navigation */}
+      {viewMode === 'mobile' && (
+        <nav className={styles.bottomNav}>
+          {tabs.map((tab) => (
+            <button
+              key={tab.id}
+              className={`${styles.bottomNavItem} ${activeTab === tab.id ? styles.bottomNavItemActive : ''}`}
+              onClick={() => setActiveTab(tab.id)}
+            >
+              <Icon name={tab.icon} size={22} />
+              <span>{tab.shortLabel}</span>
+            </button>
+          ))}
+        </nav>
       )}
     </main>
   );

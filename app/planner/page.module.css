@@ -2748,3 +2748,170 @@
   pointer-events: none;
   z-index: 2;
 }
+
+/* ========== MOBILE APP VIEW ========== */
+
+/* View Toggle Button */
+.viewToggle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.viewToggle:hover {
+  background: var(--color-surface-hover);
+  border-color: var(--color-primary);
+}
+
+.viewLabel {
+  font-weight: 500;
+}
+
+/* Mobile App Container */
+.mobileApp {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  min-height: 100dvh;
+  background: var(--color-background);
+}
+
+/* Mobile Header */
+.mobileHeader {
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-4);
+  background: var(--color-surface);
+  border-bottom: 1px solid var(--color-border);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.mobileTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0;
+}
+
+.mobileHeaderActions {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Mobile Content Area */
+.mobileContent {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--space-4);
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 20px));
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Bottom Navigation */
+.bottomNav {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  background: var(--color-surface);
+  border-top: 1px solid var(--color-border);
+  padding: var(--space-2) 0;
+  padding-bottom: calc(var(--space-2) + env(safe-area-inset-bottom, 0px));
+  z-index: 1000;
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.bottomNavItem {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  padding: var(--space-2) var(--space-1);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  color: var(--color-text-muted);
+  transition: all 0.2s ease;
+  font-size: 0.65rem;
+  font-weight: 500;
+  min-height: 56px;
+}
+
+.bottomNavItem:hover {
+  color: var(--color-text);
+}
+
+.bottomNavItem svg {
+  transition: transform 0.2s ease;
+}
+
+.bottomNavItemActive {
+  color: var(--color-primary);
+}
+
+.bottomNavItemActive svg {
+  transform: scale(1.1);
+}
+
+/* Hide desktop elements in mobile mode */
+[data-view="mobile"] .desktopNav,
+[data-view="mobile"] .sidebar {
+  display: none !important;
+}
+
+[data-view="mobile"] .mainContent {
+  padding-bottom: calc(80px + env(safe-area-inset-bottom, 20px));
+}
+
+/* Mobile-specific card adjustments */
+[data-view="mobile"] .card {
+  border-radius: var(--radius-lg);
+}
+
+[data-view="mobile"] .calendarGrid {
+  font-size: 0.8rem;
+}
+
+[data-view="mobile"] .calendarDay {
+  min-height: 50px;
+  padding: var(--space-1);
+}
+
+/* Safe area handling for notch devices */
+@supports (padding-top: env(safe-area-inset-top)) {
+  .mobileHeader {
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top, 0px));
+  }
+}
+
+/* Mobile view media queries */
+@media (max-width: 768px) {
+  [data-view="mobile"] .mobileContent {
+    padding: var(--space-3);
+  }
+  
+  [data-view="mobile"] .card {
+    margin-bottom: var(--space-3);
+  }
+}
+
