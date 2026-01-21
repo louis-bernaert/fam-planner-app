@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { SplashScreen } from "./components/SplashScreen";
 
 export const metadata: Metadata = {
   title: "Fam'Planner | Organisation familiale",
@@ -48,6 +49,7 @@ export default function RootLayout({
         <link rel="apple-touch-icon" href="/logo/logo_sans_nom_couleur.png" />
       </head>
       <body>
+        <SplashScreen />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

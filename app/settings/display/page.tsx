@@ -171,10 +171,9 @@ export default function DisplaySettingsPage() {
         </button>
       </div>
 
-      <div className={styles.backLink}>
+      <div className={styles.backLinkArrow}>
         <Link href="/settings">
-          <Icon name="arrowLeft" size={14} style={{ marginRight: "6px" }} />
-          Retour aux paramètres
+          <Icon name="arrowLeft" size={20} />
         </Link>
       </div>
     </div>

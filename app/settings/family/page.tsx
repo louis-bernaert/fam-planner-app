@@ -247,9 +247,8 @@ export default function FamilySettingsPage() {
   return (
     <div className={styles.pageContainer}>
       <div className={styles.pageHeader}>
-        <Link href="/settings" className={styles.backButton}>
-          <Icon name="arrowLeft" size={14} />
-          Retour
+        <Link href="/settings" className={styles.backButtonArrow}>
+          <Icon name="arrowLeft" size={20} />
         </Link>
         <h1 className={styles.pageTitle}>Réglages famille</h1>
       </div>

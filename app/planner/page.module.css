@@ -4573,3 +4573,230 @@
   font-size: 0.7rem;
   color: var(--color-text-muted);
 }
+
+/* Mobile Task Compact Row */
+.mobileTaskItemCompact {
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+}
+
+.mobileTaskCompactRow {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+}
+
+.mobileTaskTitleCompact {
+  flex: 1;
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobileTaskMetaCompact {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  white-space: nowrap;
+}
+
+.mobileTaskBadgeSmall {
+  padding: 2px 6px;
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  font-size: 0.65rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+}
+
+.mobileEditBtnSmall,
+.mobileDeleteBtnSmall {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mobileEditBtnSmall {
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+}
+
+.mobileDeleteBtnSmall {
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+}
+
+/* Calendar View Selector */
+.mobileCalendarViewSelector {
+  display: flex;
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-lg);
+  padding: 3px;
+  margin-bottom: var(--space-2);
+}
+
+.mobileViewBtn {
+  flex: 1;
+  padding: var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.8rem;
+  font-weight: 500;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mobileViewBtnActive {
+  background: var(--color-surface);
+  color: var(--color-primary);
+  box-shadow: var(--shadow-sm);
+}
+
+/* Calendar Colored Dots */
+.mobileCalendarDots {
+  position: absolute;
+  bottom: 2px;
+  display: flex;
+  gap: 2px;
+  justify-content: center;
+}
+
+.mobileCalendarDotColored {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+}
+
+.mobileCalendarToday .mobileCalendarDotColored {
+  border: 1px solid white;
+}
+
+/* Week View */
+.mobileWeekView {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mobileWeekDay {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.mobileWeekDayToday {
+  border-color: var(--color-primary);
+  background: var(--color-primary-subtle);
+}
+
+.mobileWeekDayHeader {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-width: 45px;
+}
+
+.mobileWeekDayName {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+}
+
+.mobileWeekDayNum {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.mobileWeekDayToday .mobileWeekDayNum {
+  color: var(--color-primary);
+}
+
+.mobileWeekDayEvents {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobileWeekEvent {
+  padding: 4px 8px;
+  background: var(--color-bg);
+  border-left: 3px solid var(--color-primary);
+  border-radius: 0 var(--radius-sm) var(--radius-sm) 0;
+  font-size: 0.75rem;
+}
+
+.mobileWeekEventTitle {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--color-text);
+}
+
+.mobileWeekMore {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+}
+
+/* Day View */
+.mobileDayView {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mobileDayEvent {
+  display: flex;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.mobileDayEventColor {
+  width: 4px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.mobileDayEventInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+}
+
+.mobileDayEventTitle {
+  font-size: 0.9rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.mobileDayEventTime {
+  font-size: 0.75rem;
+  color: var(--color-text-muted);
+}
+
+.mobileDayEventUser {
+  font-size: 0.7rem;
+  color: var(--color-primary);
+}

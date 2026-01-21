@@ -232,7 +232,8 @@ export default function PlannerPage() {
   const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
   const [mobileSelectedUser, setMobileSelectedUser] = useState<string | null>(null);
   const [mobileNewTaskSchedules, setMobileNewTaskSchedules] = useState<string[]>([]);
-  const [selectedCalendarDay, setSelectedCalendarDay] = useState<Date | null>(null);
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<Date | null>(new Date());
+  const [mobileCalendarView, setMobileCalendarView] = useState<'month' | 'week' | 'day'>('month');
 
   // Theme state
   const [theme, setTheme] = useState<Theme>(() => {
@@ -4402,8 +4403,8 @@ export default function PlannerPage() {
                         <div className={styles.mobileInputWithUnit}>
                           <input
                             type="number"
-                            value={newTask.duration}
-                            onChange={(e) => setNewTask({ ...newTask, duration: parseInt(e.target.value) || 0 })}
+                            value={newTask.duration || ''}
+                            onChange={(e) => setNewTask({ ...newTask, duration: e.target.value === '' ? 0 : parseInt(e.target.value) })}
                             min={5}
                             max={240}
                           />
@@ -4415,8 +4416,8 @@ export default function PlannerPage() {
                         <div className={styles.mobileInputWithUnit}>
                           <input
                             type="number"
-                            value={newTask.penibility}
-                            onChange={(e) => setNewTask({ ...newTask, penibility: parseInt(e.target.value) || 0 })}
+                            value={newTask.penibility || ''}
+                            onChange={(e) => setNewTask({ ...newTask, penibility: e.target.value === '' ? 0 : parseInt(e.target.value) })}
                             min={1}
                             max={100}
                           />
@@ -4487,7 +4488,7 @@ export default function PlannerPage() {
                   {/* Task List with Edit/Delete */}
                   <div className={styles.mobileTaskList}>
                     {tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).map((task) => (
-                      <div key={task.id} className={styles.mobileTaskItemEditable}>
+                      <div key={task.id} className={styles.mobileTaskItemCompact}>
                         {editingTaskId === task.id ? (
                           // Edit Mode
                           <div className={styles.mobileEditForm}>
@@ -4497,23 +4498,70 @@ export default function PlannerPage() {
                               value={editTaskDraft.title}
                               onChange={(e) => setEditTaskDraft({ ...editTaskDraft, title: e.target.value })}
                             />
-                            <div className={styles.mobileInputRow}>
-                              <input
-                                type="number"
-                                className={styles.mobileInputSmall}
-                                value={editTaskDraft.duration}
-                                onChange={(e) => setEditTaskDraft({ ...editTaskDraft, duration: parseInt(e.target.value) || 0 })}
-                                min={5}
-                                max={240}
-                              />
-                              <input
-                                type="number"
-                                className={styles.mobileInputSmall}
-                                value={editTaskDraft.penibility}
-                                onChange={(e) => setEditTaskDraft({ ...editTaskDraft, penibility: parseInt(e.target.value) || 0 })}
-                                min={1}
-                                max={100}
-                              />
+                            <div className={styles.mobileInputRowEqual}>
+                              <div className={styles.mobileInputGroupCompact}>
+                                <label>Durée</label>
+                                <div className={styles.mobileInputWithUnit}>
+                                  <input
+                                    type="number"
+                                    value={editTaskDraft.duration || ''}
+                                    onChange={(e) => setEditTaskDraft({ ...editTaskDraft, duration: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                                    min={5}
+                                    max={240}
+                                  />
+                                  <span>min</span>
+                                </div>
+                              </div>
+                              <div className={styles.mobileInputGroupCompact}>
+                                <label>Pénibilité</label>
+                                <div className={styles.mobileInputWithUnit}>
+                                  <input
+                                    type="number"
+                                    value={editTaskDraft.penibility || ''}
+                                    onChange={(e) => setEditTaskDraft({ ...editTaskDraft, penibility: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                                    min={1}
+                                    max={100}
+                                  />
+                                  <span>%</span>
+                                </div>
+                              </div>
+                            </div>
+                            {/* Schedule editing */}
+                            <div className={styles.mobileScheduleSection}>
+                              <label className={styles.mobileScheduleLabel}>Créneaux</label>
+                              <div className={styles.mobileScheduleList}>
+                                {(task.schedules || [task.slot]).map((slot, idx) => (
+                                  <div key={idx} className={styles.mobileScheduleChip}>
+                                    <span>{slot}</span>
+                                    {(task.schedules?.length || 1) > 1 && (
+                                      <button onClick={() => removeScheduleFromTask(task.id, slot)}>
+                                        <Icon name="x" size={10} />
+                                      </button>
+                                    )}
+                                  </div>
+                                ))}
+                              </div>
+                              <div className={styles.mobileScheduleAdd}>
+                                <select
+                                  className={styles.mobileSelectCompact}
+                                  value={getScheduleDraft(task.id).day}
+                                  onChange={(e) => updateScheduleDraft(task.id, { day: e.target.value })}
+                                >
+                                  {dayOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                                <input
+                                  type="time"
+                                  className={styles.mobileTimeInput}
+                                  value={getScheduleDraft(task.id).time}
+                                  onChange={(e) => updateScheduleDraft(task.id, { time: e.target.value })}
+                                />
+                                <button 
+                                  className={styles.mobileAddScheduleBtn}
+                                  onClick={() => addScheduleToTask(task.id)}
+                                >
+                                  <Icon name="plus" size={14} />
+                                </button>
+                              </div>
                             </div>
                             <div className={styles.mobileEditActions}>
                               <button className={styles.mobileSaveBtn} onClick={saveEditTask}>
@@ -4526,24 +4574,18 @@ export default function PlannerPage() {
                             </div>
                           </div>
                         ) : (
-                          // View Mode
-                          <>
-                            <div className={styles.mobileTaskLeft}>
-                              <span className={styles.mobileTaskTitle}>{task.title}</span>
-                              <span className={styles.mobileTaskMeta}>
-                                {task.duration} min · Pénibilité {task.penibility}%
-                              </span>
-                            </div>
-                            <div className={styles.mobileTaskBtns}>
-                              <span className={styles.mobileTaskBadge}>{calculateTaskPoints(task)} pts</span>
-                              <button className={styles.mobileEditBtn} onClick={() => startEditTask(task)}>
-                                <Icon name="pen" size={14} />
-                              </button>
-                              <button className={styles.mobileDeleteBtn} onClick={() => deleteTask(task.id)}>
-                                <Icon name="trash" size={14} />
-                              </button>
-                            </div>
-                          </>
+                          // View Mode - Compact single line
+                          <div className={styles.mobileTaskCompactRow}>
+                            <span className={styles.mobileTaskTitleCompact}>{task.title}</span>
+                            <span className={styles.mobileTaskMetaCompact}>{task.duration}min</span>
+                            <span className={styles.mobileTaskBadgeSmall}>{calculateTaskPoints(task)}pts</span>
+                            <button className={styles.mobileEditBtnSmall} onClick={() => startEditTask(task)}>
+                              <Icon name="pen" size={12} />
+                            </button>
+                            <button className={styles.mobileDeleteBtnSmall} onClick={() => deleteTask(task.id)}>
+                              <Icon name="trash" size={12} />
+                            </button>
+                          </div>
                         )}
                       </div>
                     ))}
@@ -4554,70 +4596,168 @@ export default function PlannerPage() {
               {/* Mobile Calendar */}
               {activeTab === "dispos" && (
                 <div className={styles.mobileTab}>
+                  {/* View selector */}
+                  <div className={styles.mobileCalendarViewSelector}>
+                    <button 
+                      className={`${styles.mobileViewBtn} ${mobileCalendarView === 'month' ? styles.mobileViewBtnActive : ''}`}
+                      onClick={() => setMobileCalendarView('month')}
+                    >Mois</button>
+                    <button 
+                      className={`${styles.mobileViewBtn} ${mobileCalendarView === 'week' ? styles.mobileViewBtnActive : ''}`}
+                      onClick={() => setMobileCalendarView('week')}
+                    >Semaine</button>
+                    <button 
+                      className={`${styles.mobileViewBtn} ${mobileCalendarView === 'day' ? styles.mobileViewBtnActive : ''}`}
+                      onClick={() => setMobileCalendarView('day')}
+                    >Jour</button>
+                  </div>
+
                   <div className={styles.mobileCalendarHeader}>
-                    <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))} className={styles.mobileNavBtn}>
+                    <button onClick={() => {
+                      if (mobileCalendarView === 'month') {
+                        setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1));
+                      } else if (mobileCalendarView === 'week') {
+                        const newDate = new Date(selectedCalendarDay || new Date());
+                        newDate.setDate(newDate.getDate() - 7);
+                        setSelectedCalendarDay(newDate);
+                        setCalendarMonth(new Date(newDate.getFullYear(), newDate.getMonth()));
+                      } else {
+                        const newDate = new Date(selectedCalendarDay || new Date());
+                        newDate.setDate(newDate.getDate() - 1);
+                        setSelectedCalendarDay(newDate);
+                        setCalendarMonth(new Date(newDate.getFullYear(), newDate.getMonth()));
+                      }
+                    }} className={styles.mobileNavBtn}>
                       <Icon name="chevronLeft" size={20} />
                     </button>
                     <span className={styles.mobileMonthLabel}>
-                      {calendarMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                      {mobileCalendarView === 'day' && selectedCalendarDay 
+                        ? selectedCalendarDay.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+                        : mobileCalendarView === 'week' && selectedCalendarDay
+                        ? `Sem. du ${getWeekStart(selectedCalendarDay).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`
+                        : calendarMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+                      }
                     </span>
-                    <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))} className={styles.mobileNavBtn}>
+                    <button onClick={() => {
+                      if (mobileCalendarView === 'month') {
+                        setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1));
+                      } else if (mobileCalendarView === 'week') {
+                        const newDate = new Date(selectedCalendarDay || new Date());
+                        newDate.setDate(newDate.getDate() + 7);
+                        setSelectedCalendarDay(newDate);
+                        setCalendarMonth(new Date(newDate.getFullYear(), newDate.getMonth()));
+                      } else {
+                        const newDate = new Date(selectedCalendarDay || new Date());
+                        newDate.setDate(newDate.getDate() + 1);
+                        setSelectedCalendarDay(newDate);
+                        setCalendarMonth(new Date(newDate.getFullYear(), newDate.getMonth()));
+                      }
+                    }} className={styles.mobileNavBtn}>
                       <Icon name="chevronRight" size={20} />
                     </button>
                   </div>
 
-                  <div className={styles.mobileCalendarGrid}>
-                    {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
-                      <div key={i} className={styles.mobileCalendarDayName}>{d}</div>
-                    ))}
-                    {generateCalendarDays(calendarMonth).map((day, idx) => {
-                      const hasEvents = day ? getEventsForDate(day).length > 0 : false;
-                      const isSelected = day && selectedCalendarDay && day.toDateString() === selectedCalendarDay.toDateString();
-                      return (
-                        <button 
-                          key={idx} 
-                          className={`${styles.mobileCalendarDay} ${day && day.toDateString() === new Date().toDateString() ? styles.mobileCalendarToday : ''} ${isSelected ? styles.mobileCalendarSelected : ''}`}
-                          onClick={() => day && setSelectedCalendarDay(day)}
-                          disabled={!day}
-                        >
-                          {day?.getDate()}
-                          {hasEvents && <span className={styles.mobileCalendarDot}></span>}
-                        </button>
-                      );
-                    })}
-                  </div>
-
-                  {/* Events for selected day */}
-                  {selectedCalendarDay && (
-                    <div className={styles.mobileSection}>
-                      <h3 className={styles.mobileSectionTitle}>
-                        {selectedCalendarDay.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
-                      </h3>
-                      <div className={styles.mobileEventsList}>
-                        {getEventsForDate(selectedCalendarDay).length === 0 ? (
-                          <p className={styles.mobileEmptyState}>Aucun événement</p>
-                        ) : (
-                          getEventsForDate(selectedCalendarDay).map((event, idx) => {
-                            const member = calendarMembers.find(m => m.userId === event.userId);
-                            const user = users.find(u => u.id === event.userId);
-                            return (
-                              <div key={idx} className={styles.mobileEventItem}>
-                                <div 
-                                  className={styles.mobileEventColor}
-                                  style={{ backgroundColor: member?.color || `hsl(${(users.findIndex(u => u.id === event.userId) * 60) % 360}, 60%, 50%)` }}
-                                />
-                                <div className={styles.mobileEventInfo}>
-                                  <span className={styles.mobileEventTitle}>{event.summary}</span>
-                                  <span className={styles.mobileEventMeta}>
-                                    {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
-                                    {user && ` · ${user.name}`}
-                                  </span>
-                                </div>
+                  {/* Month View */}
+                  {mobileCalendarView === 'month' && (
+                    <div className={styles.mobileCalendarGrid}>
+                      {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
+                        <div key={i} className={styles.mobileCalendarDayName}>{d}</div>
+                      ))}
+                      {generateCalendarDays(calendarMonth).map((day, idx) => {
+                        const dayEvents = day ? getEventsForDate(day) : [];
+                        const uniqueUserColors = day ? [...new Set(dayEvents.map(e => {
+                          const member = calendarMembers.find(m => m.userId === e.userId);
+                          return member?.color || `hsl(${(users.findIndex(u => u.id === e.userId) * 60) % 360}, 60%, 50%)`;
+                        }))] : [];
+                        const isSelected = day && selectedCalendarDay && day.toDateString() === selectedCalendarDay.toDateString();
+                        return (
+                          <button 
+                            key={idx} 
+                            className={`${styles.mobileCalendarDay} ${day && day.toDateString() === new Date().toDateString() ? styles.mobileCalendarToday : ''} ${isSelected ? styles.mobileCalendarSelected : ''}`}
+                            onClick={() => day && setSelectedCalendarDay(day)}
+                            disabled={!day}
+                          >
+                            {day?.getDate()}
+                            {uniqueUserColors.length > 0 && (
+                              <div className={styles.mobileCalendarDots}>
+                                {uniqueUserColors.slice(0, 3).map((color, i) => (
+                                  <span key={i} className={styles.mobileCalendarDotColored} style={{ backgroundColor: color }}></span>
+                                ))}
                               </div>
-                            );
-                          })
-                        )}
-                      </div>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  {/* Week View */}
+                  {mobileCalendarView === 'week' && (
+                    <div className={styles.mobileWeekView}>
+                      {(() => {
+                        const weekStart = getWeekStart(selectedCalendarDay || new Date());
+                        const days = Array.from({ length: 7 }, (_, i) => {
+                          const d = new Date(weekStart);
+                          d.setDate(d.getDate() + i);
+                          return d;
+                        });
+                        return days.map((day, idx) => {
+                          const dayEvents = getEventsForDate(day);
+                          const isToday = day.toDateString() === new Date().toDateString();
+                          return (
+                            <div key={idx} className={`${styles.mobileWeekDay} ${isToday ? styles.mobileWeekDayToday : ''}`}>
+                              <div className={styles.mobileWeekDayHeader}>
+                                <span className={styles.mobileWeekDayName}>{day.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
+                                <span className={styles.mobileWeekDayNum}>{day.getDate()}</span>
+                              </div>
+                              <div className={styles.mobileWeekDayEvents}>
+                                {dayEvents.slice(0, 3).map((event, i) => {
+                                  const member = calendarMembers.find(m => m.userId === event.userId);
+                                  return (
+                                    <div 
+                                      key={i} 
+                                      className={styles.mobileWeekEvent}
+                                      style={{ borderLeftColor: member?.color || 'var(--color-primary)' }}
+                                    >
+                                      <span className={styles.mobileWeekEventTitle}>{event.summary}</span>
+                                    </div>
+                                  );
+                                })}
+                                {dayEvents.length > 3 && <span className={styles.mobileWeekMore}>+{dayEvents.length - 3}</span>}
+                              </div>
+                            </div>
+                          );
+                        });
+                      })()}
+                    </div>
+                  )}
+
+                  {/* Day View */}
+                  {mobileCalendarView === 'day' && selectedCalendarDay && (
+                    <div className={styles.mobileDayView}>
+                      {getEventsForDate(selectedCalendarDay).length === 0 ? (
+                        <p className={styles.mobileEmptyState}>Aucun événement ce jour</p>
+                      ) : (
+                        getEventsForDate(selectedCalendarDay).map((event, idx) => {
+                          const member = calendarMembers.find(m => m.userId === event.userId);
+                          const user = users.find(u => u.id === event.userId);
+                          return (
+                            <div key={idx} className={styles.mobileDayEvent}>
+                              <div 
+                                className={styles.mobileDayEventColor}
+                                style={{ backgroundColor: member?.color || `hsl(${(users.findIndex(u => u.id === event.userId) * 60) % 360}, 60%, 50%)` }}
+                              />
+                              <div className={styles.mobileDayEventInfo}>
+                                <span className={styles.mobileDayEventTitle}>{event.summary}</span>
+                                <span className={styles.mobileDayEventTime}>
+                                  {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                                </span>
+                                {user && <span className={styles.mobileDayEventUser}>{user.name}</span>}
+                              </div>
+                            </div>
+                          );
+                        })
+                      )}
                     </div>
                   )}
                 </div>
