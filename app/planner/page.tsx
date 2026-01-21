@@ -4020,6 +4020,16 @@ export default function PlannerPage() {
                 <h1 className={styles.mobileTitle}>{tabs.find(t => t.id === activeTab)?.shortLabel}</h1>
               </div>
               <div className={styles.mobileActions}>
+                <button 
+                  className={styles.mobileIconBtn}
+                  onClick={() => {
+                    const newTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'auto' : 'light';
+                    setTheme(newTheme);
+                  }}
+                  title={`Thème: ${theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}`}
+                >
+                  <Icon name={theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'circleHalfStroke'} size={20} />
+                </button>
                 <Link href="/settings" className={styles.mobileIconBtn} title="Paramètres">
                   <Icon name="gear" size={20} />
                 </Link>
