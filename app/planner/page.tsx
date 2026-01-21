@@ -2374,69 +2374,9 @@ export default function PlannerPage() {
 
   const currentUserEntity = users.find((u) => u.id === currentUser);
 
-  return (
-    <main className={`${styles.shell} ${viewMode === 'mobile' ? styles.mobileApp : ''}`}>
-      <header className={styles.topbar}>
-        <div className={styles.brandSection}>
-          <img 
-            src="/logo/logo_sans_nom.svg" 
-            alt="Fam'Planner" 
-            className={styles.logo}
-            width={viewMode === 'mobile' ? 40 : 88}
-            height={viewMode === 'mobile' ? 40 : 88}
-          />
-          {viewMode === 'desktop' && (
-            <div>
-              <h1 className={styles.brandTitle}>Fam'Planner</h1>
-              <p className={styles.brandSubtitle}>Organisation familiale</p>
-            </div>
-          )}
-          {viewMode === 'mobile' && (
-            <h1 className={styles.mobileTitle}>{tabs.find(t => t.id === activeTab)?.shortLabel}</h1>
-          )}
-        </div>
-        <div className={styles.topActions}>
-          <button 
-            className={styles.viewToggle}
-            onClick={() => setViewMode(viewMode === 'desktop' ? 'mobile' : 'desktop')}
-            title={viewMode === 'desktop' ? 'Passer en mode Application' : 'Passer en mode Bureau'}
-          >
-            <Icon name={viewMode === 'desktop' ? 'mobileAlt' : 'desktop'} size={18} />
-            {viewMode === 'desktop' && <span className={styles.viewLabel}>App</span>}
-          </button>
-          <button 
-            className={styles.themeToggle} 
-            onClick={() => {
-              const newTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'auto' : 'light';
-              setTheme(newTheme);
-            }}
-            title={`Thème: ${theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}`}
-          >
-            <Icon name={theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'circleHalfStroke'} size={18} />
-            {viewMode === 'desktop' && <span className={styles.themeLabel}>{theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}</span>}
-          </button>
-          <Link href="/settings" className={styles.settingsLink} title="Paramètres">
-            <Icon name="gear" size={18} />
-          </Link>
-          {currentUserEntity && viewMode === 'desktop' && <span className={styles.userChip}>{currentUserEntity.name}</span>}
-          {viewMode === 'desktop' && <button className={styles.logout} onClick={logout}>Se déconnecter</button>}
-        </div>
-      </header>
-
-      {viewMode === 'desktop' && (
-        <nav className={styles.tabbar}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={activeTab === tab.id ? styles.tabButtonActive : styles.tabButton}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              {tab.label}
-          </button>
-        ))}
-      </nav>
-      )}
-
+  // Content tabs (shared between desktop and mobile)
+  const tabContent = (
+    <>
       {activeTab === "monespace" && (
         <section className={styles.tabPanel}>
           <div className={styles.cardPanel}>
@@ -3987,22 +3927,128 @@ export default function PlannerPage() {
           </div>
         </div>
       )}
+    </>
+  );
 
-      {/* Mobile Bottom Navigation */}
-      {viewMode === 'mobile' && (
-        <nav className={styles.bottomNav}>
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              className={`${styles.bottomNavItem} ${activeTab === tab.id ? styles.bottomNavItemActive : ''}`}
-              onClick={() => setActiveTab(tab.id)}
-            >
-              <Icon name={tab.icon} size={22} />
-              <span>{tab.shortLabel}</span>
-            </button>
-          ))}
-        </nav>
-      )}
+  // Mobile view - iPhone frame
+  if (viewMode === 'mobile') {
+    return (
+      <div className={styles.mobileWrapper}>
+        <div className={styles.phoneFrame}>
+          <div className={styles.phoneDynamicIsland}></div>
+          <div className={styles.phoneScreen}>
+            <header className={styles.mobileTopbar}>
+              <div className={styles.brandSection}>
+                <img 
+                  src="/logo/logo_sans_nom.svg" 
+                  alt="Fam'Planner" 
+                  className={styles.logo}
+                  width={32}
+                  height={32}
+                />
+                <h1 className={styles.mobileTitle}>{tabs.find(t => t.id === activeTab)?.shortLabel}</h1>
+              </div>
+              <div className={styles.topActions}>
+                <button 
+                  className={styles.viewToggle}
+                  onClick={() => setViewMode('desktop')}
+                  title="Passer en mode Bureau"
+                >
+                  <Icon name="desktop" size={18} />
+                </button>
+                <button 
+                  className={styles.themeToggle} 
+                  onClick={() => {
+                    const newTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'auto' : 'light';
+                    setTheme(newTheme);
+                  }}
+                  title={`Thème: ${theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}`}
+                >
+                  <Icon name={theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'circleHalfStroke'} size={18} />
+                </button>
+              </div>
+            </header>
+
+            <div className={styles.phoneContent}>
+              {tabContent}
+            </div>
+
+            <nav className={styles.bottomNav}>
+              {tabs.map((tab) => (
+                <button
+                  key={tab.id}
+                  className={`${styles.bottomNavItem} ${activeTab === tab.id ? styles.bottomNavItemActive : ''}`}
+                  onClick={() => setActiveTab(tab.id)}
+                >
+                  <Icon name={tab.icon} size={22} />
+                  <span>{tab.shortLabel}</span>
+                </button>
+              ))}
+            </nav>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Desktop view
+  return (
+    <main className={styles.shell}>
+      <header className={styles.topbar}>
+        <div className={styles.brandSection}>
+          <img 
+            src="/logo/logo_sans_nom.svg" 
+            alt="Fam'Planner" 
+            className={styles.logo}
+            width={88}
+            height={88}
+          />
+          <div>
+            <h1 className={styles.brandTitle}>Fam'Planner</h1>
+            <p className={styles.brandSubtitle}>Organisation familiale</p>
+          </div>
+        </div>
+        <div className={styles.topActions}>
+          <button 
+            className={styles.viewToggle}
+            onClick={() => setViewMode('mobile')}
+            title="Passer en mode Application"
+          >
+            <Icon name="mobileAlt" size={18} />
+            <span className={styles.viewLabel}>App</span>
+          </button>
+          <button 
+            className={styles.themeToggle} 
+            onClick={() => {
+              const newTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'auto' : 'light';
+              setTheme(newTheme);
+            }}
+            title={`Thème: ${theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}`}
+          >
+            <Icon name={theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'circleHalfStroke'} size={18} />
+            <span className={styles.themeLabel}>{theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}</span>
+          </button>
+          <Link href="/settings" className={styles.settingsLink} title="Paramètres">
+            <Icon name="gear" size={18} />
+          </Link>
+          {currentUserEntity && <span className={styles.userChip}>{currentUserEntity.name}</span>}
+          <button className={styles.logout} onClick={logout}>Se déconnecter</button>
+        </div>
+      </header>
+
+      <nav className={styles.tabbar}>
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            className={activeTab === tab.id ? styles.tabButtonActive : styles.tabButton}
+            onClick={() => setActiveTab(tab.id)}
+          >
+            {tab.label}
+          </button>
+        ))}
+      </nav>
+
+      {tabContent}
     </main>
   );
 }

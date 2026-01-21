@@ -2775,6 +2775,177 @@
   font-weight: 500;
 }
 
+/* ========== iPhone Frame Simulation ========== */
+
+/* Wrapper - centers the phone on screen */
+.mobileWrapper {
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  padding: var(--space-6);
+}
+
+/* Phone Frame - iPhone 15 Pro Max style */
+.phoneFrame {
+  position: relative;
+  width: 430px;
+  height: 932px;
+  background: #1a1a1a;
+  border-radius: 60px;
+  padding: 12px;
+  box-shadow: 
+    0 0 0 2px #2a2a2a,
+    0 0 0 4px #1a1a1a,
+    0 50px 100px -20px rgba(0, 0, 0, 0.5),
+    0 30px 60px -30px rgba(0, 0, 0, 0.4),
+    inset 0 0 20px rgba(255, 255, 255, 0.05);
+}
+
+/* Dynamic Island */
+.phoneDynamicIsland {
+  position: absolute;
+  top: 22px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 126px;
+  height: 37px;
+  background: #000;
+  border-radius: 20px;
+  z-index: 1000;
+}
+
+/* Phone Screen */
+.phoneScreen {
+  width: 100%;
+  height: 100%;
+  background: var(--color-bg);
+  border-radius: 48px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+/* Mobile Topbar inside phone */
+.mobileTopbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 60px var(--space-4) var(--space-3);
+  background: rgba(var(--color-surface-rgb, 255, 255, 255), 0.85);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  border-bottom: 0.5px solid var(--color-border);
+  flex-shrink: 0;
+}
+
+.mobileTopbar .brandSection {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.mobileTopbar .logo {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+.mobileTopbar .topActions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.mobileTopbar .viewToggle,
+.mobileTopbar .themeToggle {
+  padding: var(--space-2);
+  border-radius: var(--radius-md);
+}
+
+/* Phone Content Area */
+.phoneContent {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  -webkit-overflow-scrolling: touch;
+  padding: var(--space-3);
+  padding-bottom: 90px;
+}
+
+.phoneContent::-webkit-scrollbar {
+  display: none;
+}
+
+.phoneContent .tabPanel {
+  padding: 0;
+}
+
+.phoneContent .cardPanel {
+  padding: var(--space-3);
+  border-radius: var(--radius-lg);
+}
+
+/* Bottom Navigation inside phone */
+.phoneScreen .bottomNav {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  display: flex;
+  justify-content: space-around;
+  align-items: stretch;
+  background: rgba(var(--color-surface-rgb, 255, 255, 255), 0.92);
+  border-top: 0.5px solid var(--color-border);
+  padding: var(--space-1) 0 20px;
+  backdrop-filter: saturate(180%) blur(20px);
+  -webkit-backdrop-filter: saturate(180%) blur(20px);
+}
+
+/* Responsive adjustments for smaller screens */
+@media (max-height: 1000px) {
+  .phoneFrame {
+    height: 85vh;
+    max-height: 932px;
+  }
+}
+
+@media (max-width: 500px) {
+  .mobileWrapper {
+    padding: 0;
+    background: var(--color-bg);
+  }
+  
+  .phoneFrame {
+    width: 100%;
+    height: 100vh;
+    height: 100dvh;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+    background: transparent;
+  }
+  
+  .phoneDynamicIsland {
+    display: none;
+  }
+  
+  .phoneScreen {
+    border-radius: 0;
+  }
+  
+  .mobileTopbar {
+    padding-top: calc(var(--space-3) + env(safe-area-inset-top, 44px));
+  }
+  
+  .phoneScreen .bottomNav {
+    padding-bottom: calc(20px + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* ========== Legacy Mobile App Styles (kept for compatibility) ========== */
+
 /* Mobile App Container - Full screen app experience */
 .mobileApp {
   display: flex;
@@ -2968,6 +3139,127 @@
 
 [data-view="mobile"] .mainContent {
   padding-bottom: calc(100px + env(safe-area-inset-bottom, 20px));
+}
+
+/* ========== Phone Content Specific Styles ========== */
+
+/* Force single column layouts in phone */
+.phoneContent .hero,
+.phoneContent .split,
+.phoneContent .features,
+.phoneContent .pointsGrid,
+.phoneContent .tasksGrid,
+.phoneContent .calendarContent {
+  display: flex !important;
+  flex-direction: column !important;
+  gap: var(--space-3);
+}
+
+.phoneContent .heroVisual {
+  display: none !important;
+}
+
+/* Cards in phone */
+.phoneContent .card,
+.phoneContent .cardPanel,
+.phoneContent .visualCard,
+.phoneContent .metricsPanel,
+.phoneContent .spaceCard {
+  border-radius: var(--radius-lg);
+  margin-bottom: var(--space-3);
+  padding: var(--space-3);
+}
+
+/* Calendar adjustments for phone */
+.phoneContent .calendarGrid {
+  font-size: 0.7rem;
+}
+
+.phoneContent .calendarDay {
+  min-height: 40px;
+  padding: 2px;
+}
+
+.phoneContent .calendarDayEvents {
+  font-size: 0.6rem;
+}
+
+/* Forms in phone */
+.phoneContent input,
+.phoneContent select,
+.phoneContent textarea {
+  font-size: 16px !important;
+  min-height: 44px;
+  border-radius: var(--radius-md);
+}
+
+.phoneContent button {
+  min-height: 44px;
+  border-radius: var(--radius-md);
+}
+
+/* Typography adjustments */
+.phoneContent h2 {
+  font-size: 1.25rem;
+}
+
+.phoneContent h3 {
+  font-size: 1rem;
+}
+
+.phoneContent h4 {
+  font-size: 0.875rem;
+}
+
+/* Task items */
+.phoneContent .taskRow,
+.phoneContent .taskItem {
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+}
+
+/* Points display */
+.phoneContent .pointsValue {
+  font-size: 1.5rem;
+}
+
+/* Mon Espace adjustments */
+.phoneContent .monEspaceHeader {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: var(--space-2);
+}
+
+.phoneContent .myPointsTotal {
+  width: 100%;
+  justify-content: space-between;
+}
+
+/* Sections */
+.phoneContent .monEspaceSection {
+  margin-bottom: var(--space-4);
+}
+
+/* Dark mode for phone frame */
+:global([data-theme="dark"]) .phoneFrame {
+  background: #000;
+  box-shadow: 
+    0 0 0 2px #1a1a1a,
+    0 0 0 4px #000,
+    0 50px 100px -20px rgba(0, 0, 0, 0.7),
+    0 30px 60px -30px rgba(0, 0, 0, 0.6);
+}
+
+:global([data-theme="dark"]) .mobileTopbar {
+  background: rgba(24, 24, 27, 0.85);
+}
+
+:global([data-theme="dark"]) .phoneScreen .bottomNav {
+  background: rgba(24, 24, 27, 0.92);
+}
+
+:global([data-theme="dark"]) .mobileWrapper {
+  background: linear-gradient(135deg, #1e1e2e 0%, #2d1b4e 100%);
 }
 
 /* Mobile-specific card adjustments */
