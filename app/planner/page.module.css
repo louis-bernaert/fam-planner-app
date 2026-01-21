@@ -3373,3 +3373,506 @@
   }
 }
 
+/* ========== NEW MOBILE COMPACT UI ========== */
+
+/* Mobile Actions in header */
+.mobileActions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.mobileIconBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: none;
+  background: transparent;
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  -webkit-tap-highlight-color: transparent;
+  text-decoration: none;
+}
+
+.mobileIconBtn:active {
+  background: var(--color-bg-muted);
+  transform: scale(0.95);
+}
+
+/* Mobile Tab Content */
+.mobileTab {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+/* Mobile Points Card */
+.mobilePointsCard {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-4);
+  background: linear-gradient(135deg, var(--color-primary), #8b5cf6);
+  border-radius: var(--radius-xl);
+  color: white;
+}
+
+.mobilePointsInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobilePointsLabel {
+  font-size: 0.75rem;
+  opacity: 0.9;
+}
+
+.mobilePointsValue {
+  font-size: 2rem;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.mobilePointsIcon {
+  width: 48px;
+  height: 48px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: var(--radius-lg);
+}
+
+/* Mobile Quick Stats */
+.mobileQuickStats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+
+.mobileStatCard {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+}
+
+.mobileStatValue {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--color-primary);
+}
+
+.mobileStatLabel {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* Mobile Section */
+.mobileSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mobileSectionTitle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+  margin: 0;
+  padding: 0 var(--space-1);
+}
+
+/* Mobile Task List */
+.mobileTaskList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobileTaskItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.mobileTaskColor {
+  width: 4px;
+  height: 100%;
+  min-height: 32px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.mobileTaskLeft {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.mobileTaskTitle {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.mobileTaskMeta {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+}
+
+.mobileTaskPoints {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-primary);
+  flex-shrink: 0;
+}
+
+.mobileShowMore {
+  padding: var(--space-2);
+  background: transparent;
+  border: 1px dashed var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+/* Mobile Validate Item */
+.mobileValidateItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-warning-subtle);
+  border: 1px solid var(--color-warning);
+  border-radius: var(--radius-md);
+}
+
+.mobileValidateBtns {
+  display: flex;
+  gap: 8px;
+}
+
+.mobileValidateYes,
+.mobileValidateNo {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mobileValidateYes {
+  background: var(--color-success);
+  color: white;
+}
+
+.mobileValidateNo {
+  background: var(--color-error);
+  color: white;
+}
+
+/* Mobile Week Navigation */
+.mobileWeekNav {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+}
+
+.mobileNavBtn {
+  width: 36px;
+  height: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  color: var(--color-text);
+  cursor: pointer;
+}
+
+.mobileWeekLabel,
+.mobileMonthLabel {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+/* Mobile Day Pills */
+.mobileDayPills {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  padding: var(--space-1) 0;
+}
+
+.mobileDayPills::-webkit-scrollbar {
+  display: none;
+}
+
+.mobileDayPill {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-width: 48px;
+  padding: var(--space-2);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-lg);
+  cursor: pointer;
+  position: relative;
+  transition: all 0.15s ease;
+}
+
+.mobileDayPill:active {
+  transform: scale(0.95);
+}
+
+.mobileDayPillToday {
+  background: var(--color-primary);
+  border-color: var(--color-primary);
+  color: white;
+}
+
+.mobileDayName {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  color: inherit;
+  opacity: 0.7;
+}
+
+.mobileDayNum {
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.mobileDayDot {
+  position: absolute;
+  bottom: 4px;
+  width: 4px;
+  height: 4px;
+  background: var(--color-primary);
+  border-radius: 50%;
+}
+
+.mobileDayPillToday .mobileDayDot {
+  background: white;
+}
+
+.mobileEmptyState {
+  text-align: center;
+  padding: var(--space-4);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+}
+
+/* Mobile Leaderboard */
+.mobileLeaderboard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobileLeaderItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.mobileLeaderFirst {
+  background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+  border-color: #f59e0b;
+}
+
+.mobileLeaderRank {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--color-text-muted);
+  min-width: 24px;
+}
+
+.mobileLeaderFirst .mobileLeaderRank {
+  color: #d97706;
+}
+
+.mobileLeaderAvatar {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 600;
+  font-size: 0.875rem;
+}
+
+.mobileLeaderName {
+  flex: 1;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.mobileLeaderPoints {
+  font-weight: 600;
+  color: var(--color-primary);
+}
+
+/* Mobile Activity */
+.mobileActivityList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.mobileActivityItem {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.mobileActivityInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mobileActivityTitle {
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.mobileActivityMeta {
+  font-size: 0.65rem;
+  color: var(--color-text-muted);
+}
+
+.mobileActivityPoints {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-success);
+}
+
+/* Mobile Search Bar */
+.mobileSearchBar {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-bg-muted);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-muted);
+}
+
+.mobileSearchBar input {
+  flex: 1;
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  outline: none;
+}
+
+.mobileSearchBar input::placeholder {
+  color: var(--color-text-muted);
+}
+
+/* Mobile Task Item Full */
+.mobileTaskItemFull {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.mobileTaskBadge {
+  padding: 4px 10px;
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  border-radius: var(--radius-full);
+}
+
+/* Mobile Calendar */
+.mobileCalendarHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) 0;
+}
+
+.mobileCalendarGrid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+
+.mobileCalendarDayName {
+  text-align: center;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--color-text-muted);
+  padding: var(--space-2);
+}
+
+.mobileCalendarDay {
+  aspect-ratio: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+}
+
+.mobileCalendarToday {
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
+}
+

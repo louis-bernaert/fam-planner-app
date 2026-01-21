@@ -225,6 +225,11 @@ export default function PlannerPage() {
     return 'desktop';
   });
 
+  // Mobile-specific states
+  const [selectedMobileDay, setSelectedMobileDay] = useState<Date>(new Date());
+  const [taskSearch, setTaskSearch] = useState("");
+  const [calendarMonth, setCalendarMonth] = useState(new Date());
+
   // Theme state
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
@@ -3930,6 +3935,60 @@ export default function PlannerPage() {
     </>
   );
 
+  // Mobile helper functions
+  const currentWeekStart = getWeekStart(selectedMobileDay);
+  const weekDays = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(currentWeekStart);
+    d.setDate(d.getDate() + i);
+    return d;
+  });
+
+  const goToPreviousWeek = () => {
+    const newDate = new Date(selectedMobileDay);
+    newDate.setDate(newDate.getDate() - 7);
+    setSelectedMobileDay(newDate);
+  };
+
+  const goToNextWeek = () => {
+    const newDate = new Date(selectedMobileDay);
+    newDate.setDate(newDate.getDate() + 7);
+    setSelectedMobileDay(newDate);
+  };
+
+  const getWeekRange = (start: Date) => {
+    const end = new Date(start);
+    end.setDate(end.getDate() + 6);
+    return `${start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} - ${end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
+  };
+
+  const getDayTasks = (day: Date) => {
+    const tasksForDay = getTasksForDay(day);
+    return tasksForDay.map(task => {
+      const assignment = getTaskAssignment(task.id, day);
+      const member = users.find(u => u.id === assignment?.userId);
+      return {
+        task,
+        member,
+        timeSlot: getTaskTimeSlot(task, day),
+        points: calculateTaskPoints(task)
+      };
+    });
+  };
+
+  const generateCalendarDays = (month: Date) => {
+    const year = month.getFullYear();
+    const m = month.getMonth();
+    const firstDay = new Date(year, m, 1);
+    const lastDay = new Date(year, m + 1, 0);
+    const startPadding = (firstDay.getDay() + 6) % 7; // Monday = 0
+    const days: (Date | null)[] = [];
+    
+    for (let i = 0; i < startPadding; i++) days.push(null);
+    for (let d = 1; d <= lastDay.getDate(); d++) days.push(new Date(year, m, d));
+    
+    return days;
+  };
+
   // Mobile view - iPhone frame
   if (viewMode === 'mobile') {
     return (
@@ -3943,34 +4002,296 @@ export default function PlannerPage() {
                   src="/logo/logo_sans_nom.svg" 
                   alt="Fam'Planner" 
                   className={styles.logo}
-                  width={32}
-                  height={32}
+                  width={28}
+                  height={28}
                 />
                 <h1 className={styles.mobileTitle}>{tabs.find(t => t.id === activeTab)?.shortLabel}</h1>
               </div>
-              <div className={styles.topActions}>
+              <div className={styles.mobileActions}>
+                <Link href="/settings" className={styles.mobileIconBtn} title="Paramètres">
+                  <Icon name="gear" size={20} />
+                </Link>
                 <button 
-                  className={styles.viewToggle}
-                  onClick={() => setViewMode('desktop')}
-                  title="Passer en mode Bureau"
-                >
-                  <Icon name="desktop" size={18} />
-                </button>
-                <button 
-                  className={styles.themeToggle} 
+                  className={styles.mobileIconBtn}
                   onClick={() => {
                     const newTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'auto' : 'light';
                     setTheme(newTheme);
                   }}
                   title={`Thème: ${theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}`}
                 >
-                  <Icon name={theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'circleHalfStroke'} size={18} />
+                  <Icon name={theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'circleHalfStroke'} size={20} />
+                </button>
+                <button 
+                  className={styles.mobileIconBtn}
+                  onClick={() => setViewMode('desktop')}
+                  title="Mode Bureau"
+                >
+                  <Icon name="desktop" size={20} />
                 </button>
               </div>
             </header>
 
             <div className={styles.phoneContent}>
-              {tabContent}
+              {/* Mobile Accueil */}
+              {activeTab === "monespace" && (
+                <div className={styles.mobileTab}>
+                  {/* Points Card - Compact */}
+                  <div className={styles.mobilePointsCard}>
+                    <div className={styles.mobilePointsInfo}>
+                      <span className={styles.mobilePointsLabel}>Mes points</span>
+                      <span className={styles.mobilePointsValue}>{getMyTotalPoints()}</span>
+                    </div>
+                    <div className={styles.mobilePointsIcon}>
+                      <Icon name="star" size={24} />
+                    </div>
+                  </div>
+
+                  {/* Quick Stats */}
+                  <div className={styles.mobileQuickStats}>
+                    <div className={styles.mobileStatCard}>
+                      <span className={styles.mobileStatValue}>{getMyUpcomingTasks().length}</span>
+                      <span className={styles.mobileStatLabel}>À faire</span>
+                    </div>
+                    <div className={styles.mobileStatCard}>
+                      <span className={styles.mobileStatValue}>{getMyPastTasks().filter(t => !t.validated).length}</span>
+                      <span className={styles.mobileStatLabel}>À valider</span>
+                    </div>
+                    <div className={styles.mobileStatCard}>
+                      <span className={styles.mobileStatValue}>{currentUser ? getUserPointsHistory(currentUser).length : 0}</span>
+                      <span className={styles.mobileStatLabel}>Cette sem.</span>
+                    </div>
+                  </div>
+
+                  {/* Upcoming Tasks - Compact List */}
+                  {getMyUpcomingTasks().length > 0 && (
+                    <div className={styles.mobileSection}>
+                      <h3 className={styles.mobileSectionTitle}>
+                        <Icon name="clipboardList" size={16} />
+                        Prochaines tâches
+                      </h3>
+                      <div className={styles.mobileTaskList}>
+                        {getMyUpcomingTasks().slice(0, 4).map((item, idx) => (
+                          <div key={`mobile-task-${idx}`} className={styles.mobileTaskItem}>
+                            <div className={styles.mobileTaskLeft}>
+                              <span className={styles.mobileTaskTitle}>{item.task.title}</span>
+                              <span className={styles.mobileTaskMeta}>
+                                {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })} · {item.timeSlot}
+                              </span>
+                            </div>
+                            <span className={styles.mobileTaskPoints}>+{item.points}</span>
+                          </div>
+                        ))}
+                        {getMyUpcomingTasks().length > 4 && (
+                          <button className={styles.mobileShowMore}>
+                            Voir tout ({getMyUpcomingTasks().length})
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Tasks to Validate */}
+                  {(getMyPastTasks().filter(t => !t.validated).length > 0 || getDelegatedToMeTasks().length > 0) && (
+                    <div className={styles.mobileSection}>
+                      <h3 className={styles.mobileSectionTitle} style={{ color: 'var(--color-warning)' }}>
+                        <Icon name="clock" size={16} />
+                        À valider
+                      </h3>
+                      <div className={styles.mobileTaskList}>
+                        {getMyPastTasks().filter(t => !t.validated).slice(0, 3).map((item, idx) => (
+                          <div key={`validate-${idx}`} className={styles.mobileValidateItem}>
+                            <div className={styles.mobileTaskLeft}>
+                              <span className={styles.mobileTaskTitle}>{item.task.title}</span>
+                              <span className={styles.mobileTaskMeta}>
+                                {item.date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                              </span>
+                            </div>
+                            <div className={styles.mobileValidateBtns}>
+                              <button 
+                                className={styles.mobileValidateYes}
+                                onClick={() => validateTask(item.task.id, item.date, true)}
+                              >
+                                <Icon name="check" size={16} />
+                              </button>
+                              <button 
+                                className={styles.mobileValidateNo}
+                                onClick={() => validateTask(item.task.id, item.date, false)}
+                              >
+                                <Icon name="x" size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Mobile Planning */}
+              {activeTab === "planificateur" && (
+                <div className={styles.mobileTab}>
+                  <div className={styles.mobileWeekNav}>
+                    <button onClick={goToPreviousWeek} className={styles.mobileNavBtn}>
+                      <Icon name="chevronLeft" size={20} />
+                    </button>
+                    <span className={styles.mobileWeekLabel}>
+                      {getWeekRange(currentWeekStart)}
+                    </span>
+                    <button onClick={goToNextWeek} className={styles.mobileNavBtn}>
+                      <Icon name="chevronRight" size={20} />
+                    </button>
+                  </div>
+
+                  {/* Day Pills */}
+                  <div className={styles.mobileDayPills}>
+                    {weekDays.map((day, idx) => {
+                      const isToday = day.toDateString() === new Date().toDateString();
+                      const dayTasks = getDayTasks(day);
+                      return (
+                        <button
+                          key={idx}
+                          className={`${styles.mobileDayPill} ${isToday ? styles.mobileDayPillToday : ''}`}
+                          onClick={() => setSelectedMobileDay(day)}
+                        >
+                          <span className={styles.mobileDayName}>{day.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
+                          <span className={styles.mobileDayNum}>{day.getDate()}</span>
+                          {dayTasks.length > 0 && <span className={styles.mobileDayDot}></span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+
+                  {/* Selected Day Tasks */}
+                  <div className={styles.mobileSection}>
+                    <h3 className={styles.mobileSectionTitle}>
+                      {(selectedMobileDay || new Date()).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                    </h3>
+                    <div className={styles.mobileTaskList}>
+                      {getDayTasks(selectedMobileDay || new Date()).length === 0 ? (
+                        <p className={styles.mobileEmptyState}>Aucune tâche ce jour</p>
+                      ) : (
+                        getDayTasks(selectedMobileDay || new Date()).map((item, idx) => (
+                          <div key={`day-task-${idx}`} className={styles.mobileTaskItem}>
+                            <div 
+                              className={styles.mobileTaskColor}
+                              style={{ backgroundColor: `hsl(${(users.findIndex(u => u.id === item.member?.id) * 60) % 360}, 60%, 50%)` }}
+                            />
+                            <div className={styles.mobileTaskLeft}>
+                              <span className={styles.mobileTaskTitle}>{item.task.title}</span>
+                              <span className={styles.mobileTaskMeta}>
+                                {item.timeSlot} · {item.member?.name || 'Non assigné'}
+                              </span>
+                            </div>
+                            <span className={styles.mobileTaskPoints}>+{item.points}</span>
+                          </div>
+                        ))
+                      )}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Mobile Points */}
+              {activeTab === "points" && (
+                <div className={styles.mobileTab}>
+                  {/* Leaderboard */}
+                  <div className={styles.mobileLeaderboard}>
+                    {users.sort((a, b) => (getUserTotalPoints(b.id) - getUserTotalPoints(a.id))).map((user, idx) => (
+                      <div key={user.id} className={`${styles.mobileLeaderItem} ${idx === 0 ? styles.mobileLeaderFirst : ''}`}>
+                        <span className={styles.mobileLeaderRank}>#{idx + 1}</span>
+                        <div 
+                          className={styles.mobileLeaderAvatar}
+                          style={{ backgroundColor: `hsl(${(users.indexOf(user) * 60) % 360}, 60%, 50%)` }}
+                        >
+                          {user.name.charAt(0)}
+                        </div>
+                        <span className={styles.mobileLeaderName}>{user.name}</span>
+                        <span className={styles.mobileLeaderPoints}>{getUserTotalPoints(user.id)} pts</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Recent Activity */}
+                  <div className={styles.mobileSection}>
+                    <h3 className={styles.mobileSectionTitle}>
+                      <Icon name="clock" size={16} />
+                      Activité récente
+                    </h3>
+                    <div className={styles.mobileActivityList}>
+                      {users.flatMap(u => getUserPointsHistory(u.id).map(h => ({...h, userName: u.name}))).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5).map((item, idx) => (
+                        <div key={idx} className={styles.mobileActivityItem}>
+                          <div className={styles.mobileActivityInfo}>
+                            <span className={styles.mobileActivityTitle}>{item.title}</span>
+                            <span className={styles.mobileActivityMeta}>{item.userName} · {new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                          </div>
+                          <span className={styles.mobileActivityPoints}>+{item.points}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Mobile Tasks */}
+              {activeTab === "taches" && (
+                <div className={styles.mobileTab}>
+                  <div className={styles.mobileSearchBar}>
+                    <Icon name="search" size={16} />
+                    <input 
+                      type="text" 
+                      placeholder="Rechercher une tâche..."
+                      value={taskSearch}
+                      onChange={(e) => setTaskSearch(e.target.value)}
+                    />
+                  </div>
+
+                  <div className={styles.mobileTaskList}>
+                    {tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).slice(0, 10).map((task) => (
+                      <div key={task.id} className={styles.mobileTaskItemFull}>
+                        <div className={styles.mobileTaskLeft}>
+                          <span className={styles.mobileTaskTitle}>{task.title}</span>
+                          <span className={styles.mobileTaskMeta}>
+                            {task.duration} min · Pénibilité {task.penibility}%
+                          </span>
+                        </div>
+                        <span className={styles.mobileTaskBadge}>{calculateTaskPoints(task)} pts</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Mobile Calendar */}
+              {activeTab === "dispos" && (
+                <div className={styles.mobileTab}>
+                  <div className={styles.mobileCalendarHeader}>
+                    <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() - 1))} className={styles.mobileNavBtn}>
+                      <Icon name="chevronLeft" size={20} />
+                    </button>
+                    <span className={styles.mobileMonthLabel}>
+                      {calendarMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })}
+                    </span>
+                    <button onClick={() => setCalendarMonth(new Date(calendarMonth.getFullYear(), calendarMonth.getMonth() + 1))} className={styles.mobileNavBtn}>
+                      <Icon name="chevronRight" size={20} />
+                    </button>
+                  </div>
+
+                  <div className={styles.mobileCalendarGrid}>
+                    {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
+                      <div key={i} className={styles.mobileCalendarDayName}>{d}</div>
+                    ))}
+                    {generateCalendarDays(calendarMonth).map((day, idx) => (
+                      <div 
+                        key={idx} 
+                        className={`${styles.mobileCalendarDay} ${day && day.toDateString() === new Date().toDateString() ? styles.mobileCalendarToday : ''}`}
+                      >
+                        {day?.getDate()}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
 
             <nav className={styles.bottomNav}>
