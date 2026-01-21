@@ -229,6 +229,10 @@ export default function PlannerPage() {
   const [selectedMobileDay, setSelectedMobileDay] = useState<Date>(new Date());
   const [taskSearch, setTaskSearch] = useState("");
   const [calendarMonth, setCalendarMonth] = useState(new Date());
+  const [mobileHistoryOpen, setMobileHistoryOpen] = useState(false);
+  const [mobileSelectedUser, setMobileSelectedUser] = useState<string | null>(null);
+  const [mobileNewTaskSchedules, setMobileNewTaskSchedules] = useState<string[]>([]);
+  const [selectedCalendarDay, setSelectedCalendarDay] = useState<Date | null>(null);
 
   // Theme state
   const [theme, setTheme] = useState<Theme>(() => {
@@ -4126,31 +4130,48 @@ export default function PlannerPage() {
                     </div>
                   )}
 
-                  {/* Validation History */}
+                  {/* Validation History - Collapsible */}
                   {currentUser && getUserPointsHistory(currentUser).length > 0 && (
                     <div className={styles.mobileSection}>
-                      <h3 className={styles.mobileSectionTitle} style={{ color: 'var(--color-success)' }}>
-                        <Icon name="check" size={16} />
-                        Historique validé
-                      </h3>
-                      <div className={styles.mobileHistoryList}>
-                        {getUserPointsHistory(currentUser).slice(0, 5).map((item, idx) => (
-                          <div key={`history-${idx}`} className={styles.mobileHistoryItem}>
-                            <div className={styles.mobileTaskLeft}>
-                              <span className={styles.mobileTaskTitle}>{item.title}</span>
-                              <span className={styles.mobileTaskMeta}>
-                                {new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
-                              </span>
+                      <button 
+                        className={styles.mobileHistoryToggle}
+                        onClick={() => setMobileHistoryOpen(!mobileHistoryOpen)}
+                      >
+                        <div className={styles.mobileHistoryToggleLeft}>
+                          <Icon name="check" size={16} />
+                          <span>Historique validé ({getUserPointsHistory(currentUser).length})</span>
+                        </div>
+                        <Icon name={mobileHistoryOpen ? "chevronDown" : "chevronRight"} size={16} />
+                      </button>
+                      {mobileHistoryOpen && (
+                        <div className={styles.mobileHistoryList}>
+                          {getUserPointsHistory(currentUser).map((item, idx) => (
+                            <div key={`history-${idx}`} className={styles.mobileHistoryItem}>
+                              <div className={styles.mobileTaskLeft}>
+                                <span className={styles.mobileTaskTitle}>{item.title}</span>
+                                <span className={styles.mobileTaskMeta}>
+                                  {new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                                </span>
+                              </div>
+                              <div className={styles.mobileHistoryRight}>
+                                <span className={styles.mobileHistoryPoints}>+{item.points}</span>
+                                <button 
+                                  className={styles.mobileCancelValidationBtn}
+                                  onClick={() => {
+                                    const task = tasks.find(t => t.title === item.title);
+                                    if (task) {
+                                      validateTask(task.id, new Date(item.date), false);
+                                    }
+                                  }}
+                                  title="Annuler la validation"
+                                >
+                                  <Icon name="x" size={12} />
+                                </button>
+                              </div>
                             </div>
-                            <span className={styles.mobileHistoryPoints}>+{item.points}</span>
-                          </div>
-                        ))}
-                        {getUserPointsHistory(currentUser).length > 5 && (
-                          <span className={styles.mobileMoreHistory}>
-                            +{getUserPointsHistory(currentUser).length - 5} tâches validées
-                          </span>
-                        )}
-                      </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
                   )}
                 </div>
@@ -4296,7 +4317,11 @@ export default function PlannerPage() {
                   {/* Leaderboard */}
                   <div className={styles.mobileLeaderboard}>
                     {users.sort((a, b) => (getUserTotalPoints(b.id) - getUserTotalPoints(a.id))).map((user, idx) => (
-                      <div key={user.id} className={`${styles.mobileLeaderItem} ${idx === 0 ? styles.mobileLeaderFirst : ''} ${user.id === currentUser ? styles.mobileLeaderMe : ''}`}>
+                      <button 
+                        key={user.id} 
+                        className={`${styles.mobileLeaderItem} ${idx === 0 ? styles.mobileLeaderFirst : ''} ${user.id === currentUser ? styles.mobileLeaderMe : ''} ${mobileSelectedUser === user.id ? styles.mobileLeaderSelected : ''}`}
+                        onClick={() => setMobileSelectedUser(mobileSelectedUser === user.id ? null : user.id)}
+                      >
                         <span className={styles.mobileLeaderRank}>#{idx + 1}</span>
                         <div 
                           className={styles.mobileLeaderAvatar}
@@ -4306,28 +4331,42 @@ export default function PlannerPage() {
                         </div>
                         <span className={styles.mobileLeaderName}>{user.name} {user.id === currentUser && '(moi)'}</span>
                         <span className={styles.mobileLeaderPoints}>{getUserTotalPoints(user.id)} pts</span>
-                      </div>
+                      </button>
                     ))}
                   </div>
 
-                  {/* Recent Activity */}
-                  <div className={styles.mobileSection}>
-                    <h3 className={styles.mobileSectionTitle}>
-                      <Icon name="clock" size={16} />
-                      Activité récente
-                    </h3>
-                    <div className={styles.mobileActivityList}>
-                      {users.flatMap(u => getUserPointsHistory(u.id).map(h => ({...h, userName: u.name}))).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 5).map((item, idx) => (
-                        <div key={idx} className={styles.mobileActivityItem}>
-                          <div className={styles.mobileActivityInfo}>
-                            <span className={styles.mobileActivityTitle}>{item.title}</span>
-                            <span className={styles.mobileActivityMeta}>{item.userName} · {new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
-                          </div>
-                          <span className={styles.mobileActivityPoints}>+{item.points}</span>
-                        </div>
-                      ))}
+                  {/* User Activity - Only shown when a user is selected */}
+                  {mobileSelectedUser && (
+                    <div className={styles.mobileSection}>
+                      <div className={styles.mobileUserActivityHeader}>
+                        <h3 className={styles.mobileSectionTitle}>
+                          <Icon name="clock" size={16} />
+                          Activité de {users.find(u => u.id === mobileSelectedUser)?.name}
+                        </h3>
+                        <button 
+                          className={styles.mobileCloseBtn}
+                          onClick={() => setMobileSelectedUser(null)}
+                        >
+                          <Icon name="x" size={16} />
+                        </button>
+                      </div>
+                      <div className={styles.mobileActivityList}>
+                        {getUserPointsHistory(mobileSelectedUser).length === 0 ? (
+                          <p className={styles.mobileEmptyState}>Aucune activité</p>
+                        ) : (
+                          getUserPointsHistory(mobileSelectedUser).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10).map((item, idx) => (
+                            <div key={idx} className={styles.mobileActivityItem}>
+                              <div className={styles.mobileActivityInfo}>
+                                <span className={styles.mobileActivityTitle}>{item.title}</span>
+                                <span className={styles.mobileActivityMeta}>{new Date(item.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                              </div>
+                              <span className={styles.mobileActivityPoints}>+{item.points}</span>
+                            </div>
+                          ))
+                        )}
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               )}
 
@@ -4357,46 +4396,88 @@ export default function PlannerPage() {
                       value={newTask.title}
                       onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                     />
-                    <div className={styles.mobileInputRow}>
-                      <div className={styles.mobileInputGroup}>
-                        <label>Durée (min)</label>
-                        <input
-                          type="number"
-                          className={styles.mobileInputSmall}
-                          value={newTask.duration}
-                          onChange={(e) => setNewTask({ ...newTask, duration: parseInt(e.target.value) || 0 })}
-                          min={5}
-                          max={240}
-                        />
+                    <div className={styles.mobileInputRowEqual}>
+                      <div className={styles.mobileInputGroupCompact}>
+                        <label>Durée</label>
+                        <div className={styles.mobileInputWithUnit}>
+                          <input
+                            type="number"
+                            value={newTask.duration}
+                            onChange={(e) => setNewTask({ ...newTask, duration: parseInt(e.target.value) || 0 })}
+                            min={5}
+                            max={240}
+                          />
+                          <span>min</span>
+                        </div>
                       </div>
-                      <div className={styles.mobileInputGroup}>
+                      <div className={styles.mobileInputGroupCompact}>
                         <label>Pénibilité</label>
-                        <input
-                          type="number"
-                          className={styles.mobileInputSmall}
-                          value={newTask.penibility}
-                          onChange={(e) => setNewTask({ ...newTask, penibility: parseInt(e.target.value) || 0 })}
-                          min={1}
-                          max={100}
-                        />
+                        <div className={styles.mobileInputWithUnit}>
+                          <input
+                            type="number"
+                            value={newTask.penibility}
+                            onChange={(e) => setNewTask({ ...newTask, penibility: parseInt(e.target.value) || 0 })}
+                            min={1}
+                            max={100}
+                          />
+                          <span>%</span>
+                        </div>
                       </div>
                     </div>
-                    <div className={styles.mobileInputRow}>
-                      <select
-                        className={styles.mobileSelect}
-                        value={newTaskDay}
-                        onChange={(e) => setNewTaskDay(e.target.value)}
-                      >
-                        {dayOptions.map(d => <option key={d} value={d}>{d}</option>)}
-                      </select>
-                      <input
-                        type="time"
-                        className={styles.mobileInputSmall}
-                        value={newTaskTime}
-                        onChange={(e) => setNewTaskTime(e.target.value)}
-                      />
+                    
+                    {/* Schedule slots */}
+                    <div className={styles.mobileScheduleSection}>
+                      <label className={styles.mobileScheduleLabel}>Créneaux</label>
+                      <div className={styles.mobileScheduleAdd}>
+                        <select
+                          className={styles.mobileSelectCompact}
+                          value={newTaskDay}
+                          onChange={(e) => setNewTaskDay(e.target.value)}
+                        >
+                          {dayOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                        </select>
+                        <input
+                          type="time"
+                          className={styles.mobileTimeInput}
+                          value={newTaskTime}
+                          onChange={(e) => setNewTaskTime(e.target.value)}
+                        />
+                        <button 
+                          className={styles.mobileAddScheduleBtn}
+                          onClick={() => {
+                            const slot = `${newTaskDay} · ${newTaskTime}`;
+                            if (!mobileNewTaskSchedules.includes(slot)) {
+                              setMobileNewTaskSchedules([...mobileNewTaskSchedules, slot]);
+                            }
+                          }}
+                        >
+                          <Icon name="plus" size={14} />
+                        </button>
+                      </div>
+                      {mobileNewTaskSchedules.length > 0 && (
+                        <div className={styles.mobileScheduleList}>
+                          {mobileNewTaskSchedules.map((slot, idx) => (
+                            <div key={idx} className={styles.mobileScheduleChip}>
+                              <span>{slot}</span>
+                              <button onClick={() => setMobileNewTaskSchedules(mobileNewTaskSchedules.filter((_, i) => i !== idx))}>
+                                <Icon name="x" size={10} />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
                     </div>
-                    <button className={styles.mobileCreateBtn} onClick={addTask}>
+                    
+                    <button 
+                      className={styles.mobileCreateBtnFull} 
+                      onClick={() => {
+                        if (mobileNewTaskSchedules.length > 0) {
+                          setNewTaskSchedules(mobileNewTaskSchedules);
+                        }
+                        addTask();
+                        setMobileNewTaskSchedules([]);
+                      }}
+                    >
                       <Icon name="plus" size={16} />
                       Créer la tâche
                     </button>
@@ -4489,15 +4570,56 @@ export default function PlannerPage() {
                     {['L', 'M', 'M', 'J', 'V', 'S', 'D'].map((d, i) => (
                       <div key={i} className={styles.mobileCalendarDayName}>{d}</div>
                     ))}
-                    {generateCalendarDays(calendarMonth).map((day, idx) => (
-                      <div 
-                        key={idx} 
-                        className={`${styles.mobileCalendarDay} ${day && day.toDateString() === new Date().toDateString() ? styles.mobileCalendarToday : ''}`}
-                      >
-                        {day?.getDate()}
-                      </div>
-                    ))}
+                    {generateCalendarDays(calendarMonth).map((day, idx) => {
+                      const hasEvents = day ? getEventsForDate(day).length > 0 : false;
+                      const isSelected = day && selectedCalendarDay && day.toDateString() === selectedCalendarDay.toDateString();
+                      return (
+                        <button 
+                          key={idx} 
+                          className={`${styles.mobileCalendarDay} ${day && day.toDateString() === new Date().toDateString() ? styles.mobileCalendarToday : ''} ${isSelected ? styles.mobileCalendarSelected : ''}`}
+                          onClick={() => day && setSelectedCalendarDay(day)}
+                          disabled={!day}
+                        >
+                          {day?.getDate()}
+                          {hasEvents && <span className={styles.mobileCalendarDot}></span>}
+                        </button>
+                      );
+                    })}
                   </div>
+
+                  {/* Events for selected day */}
+                  {selectedCalendarDay && (
+                    <div className={styles.mobileSection}>
+                      <h3 className={styles.mobileSectionTitle}>
+                        {selectedCalendarDay.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      </h3>
+                      <div className={styles.mobileEventsList}>
+                        {getEventsForDate(selectedCalendarDay).length === 0 ? (
+                          <p className={styles.mobileEmptyState}>Aucun événement</p>
+                        ) : (
+                          getEventsForDate(selectedCalendarDay).map((event, idx) => {
+                            const member = calendarMembers.find(m => m.userId === event.userId);
+                            const user = users.find(u => u.id === event.userId);
+                            return (
+                              <div key={idx} className={styles.mobileEventItem}>
+                                <div 
+                                  className={styles.mobileEventColor}
+                                  style={{ backgroundColor: member?.color || `hsl(${(users.findIndex(u => u.id === event.userId) * 60) % 360}, 60%, 50%)` }}
+                                />
+                                <div className={styles.mobileEventInfo}>
+                                  <span className={styles.mobileEventTitle}>{event.summary}</span>
+                                  <span className={styles.mobileEventMeta}>
+                                    {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                                    {user && ` · ${user.name}`}
+                                  </span>
+                                </div>
+                              </div>
+                            );
+                          })
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

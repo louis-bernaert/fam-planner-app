@@ -3860,22 +3860,6 @@
   padding: var(--space-2);
 }
 
-.mobileCalendarDay {
-  aspect-ratio: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 0.8rem;
-  color: var(--color-text);
-  border-radius: var(--radius-md);
-}
-
-.mobileCalendarToday {
-  background: var(--color-primary);
-  color: white;
-  font-weight: 600;
-}
-
 /* Mobile Task Registration Buttons */
 .mobileTaskItemExpanded {
   display: flex;
@@ -4199,11 +4183,61 @@
   border-color: var(--color-primary);
 }
 
+/* Mobile Leaderboard Selected */
+.mobileLeaderSelected {
+  background: var(--color-bg-muted);
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 2px var(--color-primary-subtle);
+}
+
+.mobileLeaderItem {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  width: 100%;
+  text-align: left;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mobileLeaderItem:hover {
+  background: var(--color-bg-muted);
+}
+
+/* Mobile History Toggle */
+.mobileHistoryToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-success-subtle, rgba(34, 197, 94, 0.1));
+  border: 1px solid var(--color-success);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-success);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.mobileHistoryToggleLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 /* Mobile History List */
 .mobileHistoryList {
   display: flex;
   flex-direction: column;
   gap: var(--space-2);
+  margin-top: var(--space-2);
+  max-height: 300px;
+  overflow-y: auto;
 }
 
 .mobileHistoryItem {
@@ -4212,9 +4246,15 @@
   align-items: center;
   padding: var(--space-2) var(--space-3);
   background: var(--color-surface);
-  border: 1px solid var(--color-success);
+  border: 1px solid var(--color-border);
   border-left: 3px solid var(--color-success);
   border-radius: var(--radius-md);
+}
+
+.mobileHistoryRight {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
 }
 
 .mobileHistoryPoints {
@@ -4223,9 +4263,313 @@
   color: var(--color-success);
 }
 
+.mobileCancelValidationBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid var(--color-danger);
+  background: var(--color-danger-subtle);
+  color: var(--color-danger);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.mobileCancelValidationBtn:hover {
+  background: var(--color-danger);
+  color: white;
+}
+
 .mobileMoreHistory {
   font-size: 0.75rem;
   color: var(--color-text-muted);
   text-align: center;
   padding: var(--space-2);
+}
+
+/* Mobile User Activity Header */
+.mobileUserActivityHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.mobileCloseBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border: none;
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+}
+
+.mobileCloseBtn:hover {
+  background: var(--color-border);
+  color: var(--color-text);
+}
+
+/* Mobile Task Creation - Improved Layout */
+.mobileInputRowEqual {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-2);
+}
+
+.mobileInputGroupCompact {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.mobileInputGroupCompact label {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.mobileInputWithUnit {
+  display: flex;
+  align-items: center;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  overflow: hidden;
+}
+
+.mobileInputWithUnit input {
+  flex: 1;
+  padding: var(--space-2);
+  border: none;
+  background: transparent;
+  font-size: 0.875rem;
+  color: var(--color-text);
+  width: 100%;
+  min-width: 0;
+}
+
+.mobileInputWithUnit input:focus {
+  outline: none;
+}
+
+.mobileInputWithUnit span {
+  padding: var(--space-2);
+  background: var(--color-bg-muted);
+  color: var(--color-text-muted);
+  font-size: 0.75rem;
+  border-left: 1px solid var(--color-border);
+}
+
+/* Mobile Schedule Section */
+.mobileScheduleSection {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mobileScheduleLabel {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
+  font-weight: 500;
+}
+
+.mobileScheduleAdd {
+  display: flex;
+  gap: var(--space-1);
+  align-items: center;
+}
+
+.mobileSelectCompact {
+  flex: 1;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.8rem;
+}
+
+.mobileTimeInput {
+  width: 90px;
+  padding: 8px;
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: var(--color-bg);
+  color: var(--color-text);
+  font-size: 0.8rem;
+}
+
+.mobileAddScheduleBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  flex-shrink: 0;
+}
+
+.mobileAddScheduleBtn:hover {
+  background: var(--color-primary);
+  color: white;
+}
+
+.mobileScheduleList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+
+.mobileScheduleChip {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border-radius: var(--radius-full);
+  font-size: 0.75rem;
+}
+
+.mobileScheduleChip button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 16px;
+  height: 16px;
+  border: none;
+  background: transparent;
+  color: var(--color-primary);
+  cursor: pointer;
+  padding: 0;
+}
+
+.mobileScheduleChip button:hover {
+  color: var(--color-danger);
+}
+
+.mobileCreateBtnFull {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-primary);
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  margin-top: var(--space-1);
+}
+
+.mobileCreateBtnFull:hover {
+  background: var(--color-primary-hover);
+}
+
+/* Mobile Calendar with Events */
+.mobileCalendarDay {
+  aspect-ratio: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8rem;
+  color: var(--color-text);
+  border-radius: var(--radius-md);
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  position: relative;
+  padding: 2px;
+}
+
+.mobileCalendarDay:disabled {
+  cursor: default;
+}
+
+.mobileCalendarDay:not(:disabled):hover {
+  background: var(--color-bg-muted);
+}
+
+.mobileCalendarToday {
+  background: var(--color-primary);
+  color: white;
+  font-weight: 600;
+}
+
+.mobileCalendarToday:hover {
+  background: var(--color-primary-hover);
+}
+
+.mobileCalendarSelected {
+  box-shadow: inset 0 0 0 2px var(--color-primary);
+}
+
+.mobileCalendarDot {
+  position: absolute;
+  bottom: 3px;
+  width: 4px;
+  height: 4px;
+  background: var(--color-primary);
+  border-radius: 50%;
+}
+
+.mobileCalendarToday .mobileCalendarDot {
+  background: white;
+}
+
+/* Mobile Events List */
+.mobileEventsList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.mobileEventItem {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-surface);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+}
+
+.mobileEventColor {
+  width: 4px;
+  height: 100%;
+  min-height: 32px;
+  border-radius: 2px;
+  flex-shrink: 0;
+}
+
+.mobileEventInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+
+.mobileEventTitle {
+  font-size: 0.875rem;
+  font-weight: 500;
+  color: var(--color-text);
+}
+
+.mobileEventMeta {
+  font-size: 0.7rem;
+  color: var(--color-text-muted);
 }
