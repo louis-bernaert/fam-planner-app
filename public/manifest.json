@@ -1,0 +1,19 @@
+{
+  "name": "Fam'Planner",
+  "short_name": "FamPlanner",
+  "description": "Organisation familiale - Planifiez et répartissez les tâches en famille",
+  "start_url": "/planner",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#6366f1",
+  "orientation": "portrait",
+  "scope": "/",
+  "icons": [
+    {
+      "src": "/logo/logo_sans_nom_couleur.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}

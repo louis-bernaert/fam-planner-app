@@ -51,6 +51,7 @@
   --color-surface: #ffffff;
   --color-surface-hover: #fafafa;
   --color-surface-active: #f4f4f5;
+  --color-surface-rgb: 255, 255, 255;
   
   --color-border: #e4e4e7;
   --color-border-subtle: #f4f4f5;
@@ -94,6 +95,7 @@
   --color-surface: #18181b;
   --color-surface-hover: #27272a;
   --color-surface-active: #3f3f46;
+  --color-surface-rgb: 24, 24, 27;
   
   --color-border: #27272a;
   --color-border-subtle: #18181b;
