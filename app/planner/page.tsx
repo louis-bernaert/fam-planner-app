@@ -190,7 +190,7 @@ export default function PlannerPage() {
     today.setHours(0, 0, 0, 0);
     return today;
   });
-  const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: string; userId: string | null }>>({});
+const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: string; userIds: string[] }>>({});
 
   // Mon Espace state
   const [showPastTasks, setShowPastTasks] = useState(false);
@@ -242,6 +242,7 @@ export default function PlannerPage() {
   const [mobileCalendarView, setMobileCalendarView] = useState<'month' | 'week' | 'day'>('month');
   const [mobileShowTaskForm, setMobileShowTaskForm] = useState(false);
   const [mobileShowExceptionalForm, setMobileShowExceptionalForm] = useState(false);
+  const [mobileDelegationModal, setMobileDelegationModal] = useState<{ taskId: string; date: Date } | null>(null);
 
   // Theme state
   const [theme, setTheme] = useState<Theme>(() => {
@@ -585,11 +586,16 @@ export default function PlannerPage() {
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     
-    // Update local state immediately for responsive UI
-    setTaskAssignments(prev => ({
-      ...prev,
-      [key]: { date: dateStr, userId: currentUser }
-    }));
+    // Update local state - add user to existing list or create new
+    setTaskAssignments(prev => {
+      const existing = prev[key];
+      const existingUserIds = existing?.userIds || [];
+      if (existingUserIds.includes(currentUser)) return prev; // Already assigned
+      return {
+        ...prev,
+        [key]: { date: dateStr, userIds: [...existingUserIds, currentUser] }
+      };
+    });
     
     // Save to database
     try {
@@ -604,17 +610,23 @@ export default function PlannerPage() {
   };
 
   const unclaimTask = async (taskId: string, date: Date) => {
+    if (!currentUser) return;
     const key = getTaskAssignmentKey(taskId, date);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
     
-    // Update local state immediately
-    setTaskAssignments(prev => ({
-      ...prev,
-      [key]: { date: dateStr, userId: null }
-    }));
+    // Update local state - remove current user from list
+    setTaskAssignments(prev => {
+      const existing = prev[key];
+      const existingUserIds = existing?.userIds || [];
+      const newUserIds = existingUserIds.filter(id => id !== currentUser);
+      return {
+        ...prev,
+        [key]: { date: dateStr, userIds: newUserIds }
+      };
+    });
     
     // Delete from database
     try {
@@ -669,7 +681,7 @@ export default function PlannerPage() {
       const tasksForDay = getTasksForDay(checkDate);
       tasksForDay.forEach(task => {
         const assignment = getTaskAssignment(task.id, checkDate);
-        if (assignment?.userId === currentUser) {
+        if (assignment?.userIds?.includes(currentUser)) {
           const timeSlot = getTaskTimeSlot(task, checkDate);
           
           // For today, only include tasks whose time hasn't passed yet
@@ -713,7 +725,7 @@ export default function PlannerPage() {
     const todayTasks = getTasksForDay(today);
     todayTasks.forEach(task => {
       const assignment = getTaskAssignment(task.id, today);
-      if (assignment?.userId === currentUser) {
+      if (assignment?.userIds?.includes(currentUser)) {
         const timeSlot = getTaskTimeSlot(task, today);
         const { hours, minutes } = parseTime(timeSlot);
         const taskTime = new Date(today);
@@ -745,7 +757,7 @@ export default function PlannerPage() {
       const tasksForDay = getTasksForDay(checkDate);
       tasksForDay.forEach(task => {
         const assignment = getTaskAssignment(task.id, checkDate);
-        if (assignment?.userId === currentUser) {
+        if (assignment?.userIds?.includes(currentUser)) {
           const timeSlot = getTaskTimeSlot(task, checkDate);
           const checkYear = checkDate.getFullYear();
           const checkMonth = String(checkDate.getMonth() + 1).padStart(2, '0');
@@ -1443,10 +1455,16 @@ export default function PlannerPage() {
               const registrationsRes = await fetch(`/api/task-registrations?familyId=${family.id}`);
               if (registrationsRes.ok) {
                 const registrationsData = await registrationsRes.json();
-                const newAssignments: Record<string, { date: string; userId: string | null }> = {};
+                const newAssignments: Record<string, { date: string; userIds: string[] }> = {};
                 for (const reg of registrationsData) {
                   const key = `${reg.taskId}_${reg.date}`;  // Use underscore to match getTaskAssignmentKey
-                  newAssignments[key] = { date: reg.date, userId: reg.userId };
+                  // Group by key to collect all userIds
+                  if (!newAssignments[key]) {
+                    newAssignments[key] = { date: reg.date, userIds: [] };
+                  }
+                  if (reg.userId && !newAssignments[key].userIds.includes(reg.userId)) {
+                    newAssignments[key].userIds.push(reg.userId);
+                  }
                 }
                 setTaskAssignments(prev => ({ ...prev, ...newAssignments }));
               }
@@ -3287,16 +3305,18 @@ export default function PlannerPage() {
                           .filter(task => getTaskTimeSlot(task, day) === timeSlot)
                           .map(task => {
                             const assignment = getTaskAssignment(task.id, day);
-                            const assignedUserId = assignment?.userId;
-                            const isAssignedToMe = assignedUserId === currentUser;
-                            const isAssignedToOther = assignedUserId && assignedUserId !== currentUser;
+                            const assignedUserIds = assignment?.userIds || [];
+                            const isAssignedToMe = assignedUserIds.includes(currentUser || '');
+                            const isAssignedToOther = assignedUserIds.length > 0 && !isAssignedToMe;
+                            const isPartiallyAssigned = assignedUserIds.length > 0 && !isAssignedToMe; // Others took it but I can still join
                             const iAmBusy = currentUser ? isUserBusyAtTime(currentUser, day, timeSlot) : false;
                             const pointsBreakdown = getPointsBreakdown(task);
+                            const assignedNames = assignedUserIds.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
 
                             return (
                               <div 
                                 key={task.id} 
-                                className={`${styles.plannerTask} ${isAssignedToMe ? styles.myTask : ''} ${isAssignedToOther ? styles.takenTask : ''} ${iAmBusy && !isAssignedToOther ? styles.busyTask : ''}`}
+                                className={`${styles.plannerTask} ${isAssignedToMe ? styles.myTask : ''} ${isAssignedToOther ? styles.takenTask : ''} ${iAmBusy && !isAssignedToOther && !isAssignedToMe ? styles.busyTask : ''}`}
                               >
                                 <div className={styles.plannerTaskInfo}>
                                   <strong>{task.title}</strong>
@@ -3308,12 +3328,12 @@ export default function PlannerPage() {
                                   <span className={styles.pointsBadge} title={`${pointsBreakdown.duration} min × ${pointsBreakdown.penibility}% ÷ 10`}>
                                     +{pointsBreakdown.total} pts
                                   </span>
-                                  {isAssignedToOther && (
+                                  {isPartiallyAssigned && !isAssignedToMe && (
                                     <span 
                                       className={styles.assignedBadge}
-                                      style={{ backgroundColor: getUserColor(assignedUserId) }}
+                                      style={{ backgroundColor: getUserColor(assignedUserIds[0]) }}
                                     >
-                                      {getUserName(assignedUserId)}
+                                      {assignedNames}
                                     </span>
                                   )}
                                   {isAssignedToMe && (
@@ -3322,10 +3342,10 @@ export default function PlannerPage() {
                                       onClick={() => unclaimTask(task.id, day)}
                                     >
                                       <Icon name="check" size={12} />
-                                      Pris par moi · Annuler
+                                      Pris par moi{assignedUserIds.length > 1 ? ` (+${assignedUserIds.length - 1})` : ''} · Annuler
                                     </button>
                                   )}
-                                  {!assignedUserId && !iAmBusy && (
+                                  {assignedUserIds.length === 0 && !iAmBusy && (
                                     <button 
                                       className={styles.claimBtn}
                                       onClick={() => claimTask(task.id, day)}
@@ -3333,7 +3353,15 @@ export default function PlannerPage() {
                                       Je prends !
                                     </button>
                                   )}
-                                  {!assignedUserId && iAmBusy && (
+                                  {isPartiallyAssigned && !isAssignedToMe && !iAmBusy && (
+                                    <button 
+                                      className={styles.claimBtn}
+                                      onClick={() => claimTask(task.id, day)}
+                                    >
+                                      Rejoindre
+                                    </button>
+                                  )}
+                                  {assignedUserIds.length === 0 && iAmBusy && (
                                     <span className={styles.busyBadge}>
                                       <Icon name="warning" size={12} />
                                       Indisponible
@@ -3988,10 +4016,13 @@ export default function PlannerPage() {
     const tasksForDay = getTasksForDay(day);
     return tasksForDay.map(task => {
       const assignment = getTaskAssignment(task.id, day);
-      const member = users.find(u => u.id === assignment?.userId);
+      const assignedUserIds = assignment?.userIds || [];
+      const members = assignedUserIds.map(id => users.find(u => u.id === id)).filter(Boolean);
       return {
         task,
-        member,
+        member: members[0], // For backwards compatibility
+        members,
+        assignedUserIds,
         timeSlot: getTaskTimeSlot(task, day),
         points: calculateTaskPoints(task)
       };
@@ -4131,7 +4162,7 @@ export default function PlannerPage() {
                               </button>
                               <button 
                                 className={styles.mobileValidateNo}
-                                onClick={() => validateTask(item.task.id, item.date, false)}
+                                onClick={() => setMobileDelegationModal({ taskId: item.task.id, date: item.date })}
                               >
                                 <Icon name="x" size={16} />
                               </button>
@@ -4277,11 +4308,12 @@ export default function PlannerPage() {
                   <div className={styles.mobileDayPills}>
                     {weekDays.map((day, idx) => {
                       const isToday = day.toDateString() === new Date().toDateString();
+                      const isSelected = selectedMobileDay && day.toDateString() === selectedMobileDay.toDateString();
                       const dayTasks = getDayTasks(day);
                       return (
                         <button
                           key={idx}
-                          className={`${styles.mobileDayPill} ${isToday ? styles.mobileDayPillToday : ''}`}
+                          className={`${styles.mobileDayPill} ${isSelected ? styles.mobileDayPillSelected : ''} ${isToday && !isSelected ? styles.mobileDayPillToday : ''}`}
                           onClick={() => setSelectedMobileDay(day)}
                         >
                           <span className={styles.mobileDayName}>{day.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
@@ -4304,24 +4336,29 @@ export default function PlannerPage() {
                         getDayTasks(selectedMobileDay || new Date()).map((item, idx) => {
                           const currentDay = selectedMobileDay || new Date();
                           const assignment = getTaskAssignment(item.task.id, currentDay);
-                          const isMyTask = assignment?.userId === currentUser;
-                          const isAssigned = !!assignment?.userId;
+                          const assignedUserIds = assignment?.userIds || [];
+                          const isMyTask = assignedUserIds.includes(currentUser || '');
+                          const isAssigned = assignedUserIds.length > 0;
                           const iAmBusy = currentUser ? isUserBusyAtTime(currentUser, currentDay, item.timeSlot) : false;
+                          const firstAssignedUser = assignedUserIds[0];
+                          const assignedNames = assignedUserIds.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
+                          const pointsDivider = isMyTask ? assignedUserIds.length : 1;
+                          const displayPoints = Math.round(item.points / pointsDivider);
                           
                           return (
                             <div key={`day-task-${idx}`} className={styles.mobileTaskItemExpanded}>
                               <div className={styles.mobileTaskRow}>
                                 <div 
                                   className={styles.mobileTaskColor}
-                                  style={{ backgroundColor: isAssigned ? `hsl(${(users.findIndex(u => u.id === assignment?.userId) * 60) % 360}, 60%, 50%)` : 'var(--color-muted)' }}
+                                  style={{ backgroundColor: isAssigned ? `hsl(${(users.findIndex(u => u.id === firstAssignedUser) * 60) % 360}, 60%, 50%)` : 'var(--color-muted)' }}
                                 />
                                 <div className={styles.mobileTaskLeft}>
                                   <span className={styles.mobileTaskTitle}>{item.task.title}</span>
                                   <span className={styles.mobileTaskMeta}>
-                                    {item.timeSlot} · {isAssigned ? users.find(u => u.id === assignment?.userId)?.name || 'Inconnu' : 'Libre'}
+                                    {item.timeSlot} · {isAssigned ? assignedNames || 'Inconnu' : 'Libre'}
                                   </span>
                                 </div>
-                                <span className={styles.mobileTaskPoints}>+{item.points}</span>
+                                <span className={styles.mobileTaskPoints}>+{displayPoints}{assignedUserIds.length > 1 && isMyTask ? ` (÷${assignedUserIds.length})` : ''}</span>
                               </div>
                               <div className={styles.mobileTaskActions}>
                                 {isMyTask ? (
@@ -4332,24 +4369,23 @@ export default function PlannerPage() {
                                     <Icon name="x" size={14} />
                                     Se désinscrire
                                   </button>
-                                ) : !isAssigned ? (
-                                  iAmBusy ? (
-                                    <span className={styles.mobileBusyLabel}>
-                                      <Icon name="clock" size={14} />
-                                      Occupé(e)
-                                    </span>
-                                  ) : (
-                                    <button 
-                                      className={styles.mobileRegisterBtn}
-                                      onClick={() => claimTask(item.task.id, currentDay)}
-                                    >
-                                      <Icon name="check" size={14} />
-                                      S'inscrire
-                                    </button>
-                                  )
+                                ) : iAmBusy ? (
+                                  <span className={styles.mobileBusyLabel}>
+                                    <Icon name="clock" size={14} />
+                                    Occupé(e)
+                                  </span>
                                 ) : (
+                                  <button 
+                                    className={styles.mobileRegisterBtn}
+                                    onClick={() => claimTask(item.task.id, currentDay)}
+                                  >
+                                    <Icon name="check" size={14} />
+                                    {isAssigned ? 'Rejoindre' : "S'inscrire"}
+                                  </button>
+                                )}
+                                {isAssigned && !isMyTask && (
                                   <span className={styles.mobileAssignedLabel}>
-                                    Pris par {users.find(u => u.id === assignment?.userId)?.name}
+                                    Pris par {assignedNames}
                                   </span>
                                 )}
                               </div>
@@ -4965,6 +5001,66 @@ export default function PlannerPage() {
                 </button>
               ))}
             </nav>
+
+            {/* Mobile Delegation Modal */}
+            {mobileDelegationModal && (
+              <div className={styles.mobileDelegationOverlay}>
+                <div className={styles.mobileDelegationModal}>
+                  <h3 className={styles.mobileDelegationTitle}>Qui a fait cette tâche ?</h3>
+                  <div className={styles.mobileDelegationOptions}>
+                    {users.filter(u => u.id !== currentUser).map(user => (
+                      <button
+                        key={user.id}
+                        className={styles.mobileDelegationOption}
+                        onClick={() => {
+                          delegateTask(mobileDelegationModal.taskId, mobileDelegationModal.date, user.id);
+                          setMobileDelegationModal(null);
+                        }}
+                      >
+                        <div 
+                          className={styles.mobileDelegationAvatar}
+                          style={{ backgroundColor: `hsl(${users.indexOf(user) * 60 % 360}, 60%, 50%)` }}
+                        >
+                          {user.name.charAt(0).toUpperCase()}
+                        </div>
+                        <span>{user.name}</span>
+                      </button>
+                    ))}
+                    <button
+                      className={`${styles.mobileDelegationOption} ${styles.mobileDelegationNobody}`}
+                      onClick={() => {
+                        // Mark as not done by anyone - remove from validation and clear assignment
+                        const key = getTaskAssignmentKey(mobileDelegationModal.taskId, mobileDelegationModal.date);
+                        setTaskAssignments(prev => ({
+                          ...prev,
+                          [key]: { date: prev[key]?.date || '', userIds: [] }
+                        }));
+                        // Remove from validated tasks
+                        const year = mobileDelegationModal.date.getFullYear();
+                        const month = String(mobileDelegationModal.date.getMonth() + 1).padStart(2, '0');
+                        const day = String(mobileDelegationModal.date.getDate()).padStart(2, '0');
+                        const dateStr = `${year}-${month}-${day}`;
+                        setValidatedTasks(prev => prev.filter(v => 
+                          !(v.taskId === mobileDelegationModal.taskId && v.date === dateStr && v.userId === currentUser)
+                        ));
+                        setMobileDelegationModal(null);
+                      }}
+                    >
+                      <div className={styles.mobileDelegationAvatarNobody}>
+                        <Icon name="x" size={16} />
+                      </div>
+                      <span>Personne</span>
+                    </button>
+                  </div>
+                  <button
+                    className={styles.mobileDelegationCancel}
+                    onClick={() => setMobileDelegationModal(null)}
+                  >
+                    Annuler
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
