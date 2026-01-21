@@ -568,6 +568,17 @@ export default function PlannerPage() {
 
   const claimTask = async (taskId: string, date: Date) => {
     if (!currentUser) return;
+    
+    // Find the task to get its time slot
+    const task = familyTasks.find(t => t.id === taskId);
+    if (task) {
+      const timeSlot = getTaskTimeSlot(task, date);
+      if (isUserBusyAtTime(currentUser, date, timeSlot)) {
+        alert('Vous êtes occupé(e) à cette heure selon votre agenda.');
+        return;
+      }
+    }
+    
     const key = getTaskAssignmentKey(taskId, date);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -4295,6 +4306,7 @@ export default function PlannerPage() {
                           const assignment = getTaskAssignment(item.task.id, currentDay);
                           const isMyTask = assignment?.userId === currentUser;
                           const isAssigned = !!assignment?.userId;
+                          const iAmBusy = currentUser ? isUserBusyAtTime(currentUser, currentDay, item.timeSlot) : false;
                           
                           return (
                             <div key={`day-task-${idx}`} className={styles.mobileTaskItemExpanded}>
@@ -4321,13 +4333,20 @@ export default function PlannerPage() {
                                     Se désinscrire
                                   </button>
                                 ) : !isAssigned ? (
-                                  <button 
-                                    className={styles.mobileRegisterBtn}
-                                    onClick={() => claimTask(item.task.id, currentDay)}
-                                  >
-                                    <Icon name="check" size={14} />
-                                    S'inscrire
-                                  </button>
+                                  iAmBusy ? (
+                                    <span className={styles.mobileBusyLabel}>
+                                      <Icon name="clock" size={14} />
+                                      Occupé(e)
+                                    </span>
+                                  ) : (
+                                    <button 
+                                      className={styles.mobileRegisterBtn}
+                                      onClick={() => claimTask(item.task.id, currentDay)}
+                                    >
+                                      <Icon name="check" size={14} />
+                                      S'inscrire
+                                    </button>
+                                  )
                                 ) : (
                                   <span className={styles.mobileAssignedLabel}>
                                     Pris par {users.find(u => u.id === assignment?.userId)?.name}

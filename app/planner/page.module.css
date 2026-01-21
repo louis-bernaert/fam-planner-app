@@ -3962,6 +3962,15 @@
   font-style: italic;
 }
 
+.mobileBusyLabel {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.7rem;
+  color: var(--color-warning);
+  font-weight: 500;
+}
+
 /* Mobile Task Creation Form */
 .mobileCreateTaskCard {
   display: flex;
