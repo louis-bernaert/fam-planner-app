@@ -214,16 +214,22 @@ export default function PlannerPage() {
   const [pointsHistoryModal, setPointsHistoryModal] = useState<{ userId: string; userName: string } | null>(null);
   const [showQuotaExplain, setShowQuotaExplain] = useState(false);
 
-  // View mode state (desktop/mobile app)
+  // View mode state (desktop/mobile app) - auto-detect based on screen size
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>(() => {
     if (typeof window !== 'undefined') {
-      const saved = localStorage.getItem('viewMode');
-      if (saved === 'mobile' || saved === 'desktop') return saved;
-      // Auto-detect on first load
       return window.innerWidth < 768 ? 'mobile' : 'desktop';
     }
     return 'desktop';
   });
+
+  // Auto-update viewMode on window resize
+  useEffect(() => {
+    const handleResize = () => {
+      setViewMode(window.innerWidth < 768 ? 'mobile' : 'desktop');
+    };
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   // Mobile-specific states
   const [selectedMobileDay, setSelectedMobileDay] = useState<Date>(new Date());
@@ -235,6 +241,7 @@ export default function PlannerPage() {
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<Date | null>(new Date());
   const [mobileCalendarView, setMobileCalendarView] = useState<'month' | 'week' | 'day'>('month');
   const [mobileShowTaskForm, setMobileShowTaskForm] = useState(false);
+  const [mobileShowExceptionalForm, setMobileShowExceptionalForm] = useState(false);
 
   // Theme state
   const [theme, setTheme] = useState<Theme>(() => {
@@ -256,9 +263,8 @@ export default function PlannerPage() {
     }
   }, [theme]);
 
-  // Persist viewMode to localStorage and apply class
+  // Apply data-view attribute for mobile styling
   useEffect(() => {
-    localStorage.setItem('viewMode', viewMode);
     const root = document.documentElement;
     if (viewMode === 'mobile') {
       root.setAttribute('data-view', 'mobile');
@@ -4017,23 +4023,6 @@ export default function PlannerPage() {
                 <Link href="/settings" className={styles.mobileIconBtn} title="Paramètres">
                   <Icon name="gear" size={20} />
                 </Link>
-                <button 
-                  className={styles.mobileIconBtn}
-                  onClick={() => {
-                    const newTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'auto' : 'light';
-                    setTheme(newTheme);
-                  }}
-                  title={`Thème: ${theme === 'light' ? 'Clair' : theme === 'dark' ? 'Sombre' : 'Auto'}`}
-                >
-                  <Icon name={theme === 'light' ? 'sun' : theme === 'dark' ? 'moon' : 'circleHalfStroke'} size={20} />
-                </button>
-                <button 
-                  className={styles.mobileIconBtn}
-                  onClick={() => setViewMode('desktop')}
-                  title="Mode Bureau"
-                >
-                  <Icon name="desktop" size={20} />
-                </button>
               </div>
             </header>
 
@@ -4177,62 +4166,73 @@ export default function PlannerPage() {
                     </div>
                   )}
 
-                  {/* Exceptional Task */}
+                  {/* Exceptional Task - Collapsible */}
                   <div className={styles.mobileSection}>
-                    <h3 className={styles.mobileSectionTitle}>
-                      <Icon name="star" size={16} />
-                      Tâche exceptionnelle
-                    </h3>
-                    <div className={styles.mobileExceptionalForm}>
-                      <input
-                        type="text"
-                        className={styles.mobileInput}
-                        placeholder="Nom de la tâche"
-                        value={newExceptionalTask.title}
-                        onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, title: e.target.value }))}
-                      />
-                      <div className={styles.mobileInputRowEqual}>
-                        <div className={styles.mobileInputGroupCompact}>
-                          <label>Durée</label>
-                          <div className={styles.mobileInputWithUnit}>
-                            <input
-                              type="number"
-                              value={newExceptionalTask.duration || ''}
-                              onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, duration: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
-                              min={5}
-                              max={240}
-                            />
-                            <span>min</span>
+                    <button 
+                      className={styles.mobileExceptionalToggle}
+                      onClick={() => setMobileShowExceptionalForm(!mobileShowExceptionalForm)}
+                    >
+                      <div className={styles.mobileExceptionalToggleLeft}>
+                        <Icon name="star" size={16} />
+                        <span>Tâche exceptionnelle</span>
+                      </div>
+                      <Icon name={mobileShowExceptionalForm ? "chevronDown" : "plus"} size={16} />
+                    </button>
+                    {mobileShowExceptionalForm && (
+                      <div className={styles.mobileExceptionalForm}>
+                        <input
+                          type="text"
+                          className={styles.mobileInput}
+                          placeholder="Nom de la tâche"
+                          value={newExceptionalTask.title}
+                          onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, title: e.target.value }))}
+                        />
+                        <div className={styles.mobileInputRowEqual}>
+                          <div className={styles.mobileInputGroupCompact}>
+                            <label>Durée</label>
+                            <div className={styles.mobileInputWithUnit}>
+                              <input
+                                type="number"
+                                value={newExceptionalTask.duration || ''}
+                                onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, duration: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
+                                min={5}
+                                max={240}
+                              />
+                              <span>min</span>
+                            </div>
+                          </div>
+                          <div className={styles.mobileInputGroupCompact}>
+                            <label>Pénibilité</label>
+                            <div className={styles.mobileInputWithUnit}>
+                              <input
+                                type="number"
+                                value={newExceptionalTask.penibility || ''}
+                                onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, penibility: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
+                                min={1}
+                                max={100}
+                              />
+                              <span>%</span>
+                            </div>
                           </div>
                         </div>
-                        <div className={styles.mobileInputGroupCompact}>
-                          <label>Pénibilité</label>
-                          <div className={styles.mobileInputWithUnit}>
-                            <input
-                              type="number"
-                              value={newExceptionalTask.penibility || ''}
-                              onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, penibility: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
-                              min={1}
-                              max={100}
-                            />
-                            <span>%</span>
-                          </div>
+                        <div className={styles.mobileExceptionalFooter}>
+                          <span className={styles.mobileExceptionalPoints}>
+                            +{Math.round((newExceptionalTask.duration * newExceptionalTask.penibility) / 10)} pts
+                          </span>
+                          <button 
+                            className={styles.mobileCreateBtnSmall}
+                            onClick={() => {
+                              addExceptionalTask();
+                              setMobileShowExceptionalForm(false);
+                            }}
+                            disabled={!newExceptionalTask.title.trim()}
+                          >
+                            <Icon name="plus" size={14} />
+                            Ajouter
+                          </button>
                         </div>
                       </div>
-                      <div className={styles.mobileExceptionalFooter}>
-                        <span className={styles.mobileExceptionalPoints}>
-                          +{Math.round((newExceptionalTask.duration * newExceptionalTask.penibility) / 10)} pts
-                        </span>
-                        <button 
-                          className={styles.mobileCreateBtnSmall}
-                          onClick={addExceptionalTask}
-                          disabled={!newExceptionalTask.title.trim()}
-                        >
-                          <Icon name="plus" size={14} />
-                          Ajouter
-                        </button>
-                      </div>
-                    </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -4825,6 +4825,16 @@ export default function PlannerPage() {
                               <div className={styles.mobileWeekDayHeader}>
                                 <span className={styles.mobileWeekDayName}>{day.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
                                 <span className={styles.mobileWeekDayNum}>{day.getDate()}</span>
+                                {dayEvents.length > 0 && (
+                                  <div className={styles.mobileWeekDayDots}>
+                                    {[...new Set(dayEvents.map(e => {
+                                      const member = calendarMembers.find(m => m.userId === e.userId);
+                                      return member?.color || `hsl(${(users.findIndex(u => u.id === e.userId) * 60) % 360}, 60%, 50%)`;
+                                    }))].slice(0, 3).map((color, i) => (
+                                      <span key={i} className={styles.mobileWeekDayDot} style={{ backgroundColor: color }}></span>
+                                    ))}
+                                  </div>
+                                )}
                               </div>
                               <div className={styles.mobileWeekDayEvents}>
                                 {dayEvents.slice(0, 3).map((event, i) => {

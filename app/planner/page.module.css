@@ -4266,6 +4266,28 @@
   gap: var(--space-2);
 }
 
+/* Mobile Exceptional Task Toggle */
+.mobileExceptionalToggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  background: var(--color-primary-subtle);
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  color: var(--color-primary);
+  font-weight: 500;
+  font-size: 0.875rem;
+}
+
+.mobileExceptionalToggleLeft {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
 /* Mobile History List */
 .mobileHistoryList {
   display: flex;
@@ -4472,6 +4494,7 @@
   padding: 4px 8px;
   background: var(--color-primary-subtle);
   color: var(--color-primary);
+  border: 2px solid var(--color-primary);
   border-radius: var(--radius-full);
   font-size: 0.75rem;
 }
@@ -4819,6 +4842,18 @@
 
 .mobileWeekDayToday .mobileWeekDayNum {
   color: var(--color-primary);
+}
+
+.mobileWeekDayDots {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.mobileWeekDayDot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
 }
 
 .mobileWeekDayEvents {
