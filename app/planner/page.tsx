@@ -4125,6 +4125,34 @@ export default function PlannerPage() {
                       </div>
                     </div>
                   )}
+
+                  {/* Validation History */}
+                  {currentUser && getUserPointsHistory(currentUser).length > 0 && (
+                    <div className={styles.mobileSection}>
+                      <h3 className={styles.mobileSectionTitle} style={{ color: 'var(--color-success)' }}>
+                        <Icon name="check" size={16} />
+                        Historique validé
+                      </h3>
+                      <div className={styles.mobileHistoryList}>
+                        {getUserPointsHistory(currentUser).slice(0, 5).map((item, idx) => (
+                          <div key={`history-${idx}`} className={styles.mobileHistoryItem}>
+                            <div className={styles.mobileTaskLeft}>
+                              <span className={styles.mobileTaskTitle}>{item.title}</span>
+                              <span className={styles.mobileTaskMeta}>
+                                {new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                              </span>
+                            </div>
+                            <span className={styles.mobileHistoryPoints}>+{item.points}</span>
+                          </div>
+                        ))}
+                        {getUserPointsHistory(currentUser).length > 5 && (
+                          <span className={styles.mobileMoreHistory}>
+                            +{getUserPointsHistory(currentUser).length - 5} tâches validées
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
 
@@ -4171,21 +4199,53 @@ export default function PlannerPage() {
                       {getDayTasks(selectedMobileDay || new Date()).length === 0 ? (
                         <p className={styles.mobileEmptyState}>Aucune tâche ce jour</p>
                       ) : (
-                        getDayTasks(selectedMobileDay || new Date()).map((item, idx) => (
-                          <div key={`day-task-${idx}`} className={styles.mobileTaskItem}>
-                            <div 
-                              className={styles.mobileTaskColor}
-                              style={{ backgroundColor: `hsl(${(users.findIndex(u => u.id === item.member?.id) * 60) % 360}, 60%, 50%)` }}
-                            />
-                            <div className={styles.mobileTaskLeft}>
-                              <span className={styles.mobileTaskTitle}>{item.task.title}</span>
-                              <span className={styles.mobileTaskMeta}>
-                                {item.timeSlot} · {item.member?.name || 'Non assigné'}
-                              </span>
+                        getDayTasks(selectedMobileDay || new Date()).map((item, idx) => {
+                          const currentDay = selectedMobileDay || new Date();
+                          const assignment = getTaskAssignment(item.task.id, currentDay);
+                          const isMyTask = assignment?.userId === currentUser;
+                          const isAssigned = !!assignment;
+                          
+                          return (
+                            <div key={`day-task-${idx}`} className={styles.mobileTaskItemExpanded}>
+                              <div className={styles.mobileTaskRow}>
+                                <div 
+                                  className={styles.mobileTaskColor}
+                                  style={{ backgroundColor: isAssigned ? `hsl(${(users.findIndex(u => u.id === item.member?.id) * 60) % 360}, 60%, 50%)` : 'var(--color-muted)' }}
+                                />
+                                <div className={styles.mobileTaskLeft}>
+                                  <span className={styles.mobileTaskTitle}>{item.task.title}</span>
+                                  <span className={styles.mobileTaskMeta}>
+                                    {item.timeSlot} · {item.member?.name || 'Libre'}
+                                  </span>
+                                </div>
+                                <span className={styles.mobileTaskPoints}>+{item.points}</span>
+                              </div>
+                              <div className={styles.mobileTaskActions}>
+                                {isMyTask ? (
+                                  <button 
+                                    className={styles.mobileUnregisterBtn}
+                                    onClick={() => unclaimTask(item.task.id, currentDay)}
+                                  >
+                                    <Icon name="x" size={14} />
+                                    Se désinscrire
+                                  </button>
+                                ) : !isAssigned ? (
+                                  <button 
+                                    className={styles.mobileRegisterBtn}
+                                    onClick={() => claimTask(item.task.id, currentDay)}
+                                  >
+                                    <Icon name="check" size={14} />
+                                    S'inscrire
+                                  </button>
+                                ) : (
+                                  <span className={styles.mobileAssignedLabel}>
+                                    Pris par {item.member?.name}
+                                  </span>
+                                )}
+                              </div>
                             </div>
-                            <span className={styles.mobileTaskPoints}>+{item.points}</span>
-                          </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>
@@ -4195,10 +4255,48 @@ export default function PlannerPage() {
               {/* Mobile Points */}
               {activeTab === "points" && (
                 <div className={styles.mobileTab}>
+                  {/* Weekly Goal Card */}
+                  {currentUser && (
+                    <div className={styles.mobileGoalCard}>
+                      <div className={styles.mobileGoalHeader}>
+                        <Icon name="listCheck" size={18} />
+                        <span>Objectif hebdomadaire</span>
+                      </div>
+                      <div className={styles.mobileGoalProgress}>
+                        <div className={styles.mobileGoalValues}>
+                          <span className={styles.mobileGoalCurrent}>
+                            {getUserPointsForWeek(currentUser, getWeekStart(new Date()))}
+                          </span>
+                          <span className={styles.mobileGoalSeparator}>/</span>
+                          <span className={styles.mobileGoalTarget}>
+                            {getQuotaWithAbsences(currentUser, getWeekStart(new Date()))} pts
+                          </span>
+                        </div>
+                        <div className={styles.mobileProgressBar}>
+                          <div 
+                            className={styles.mobileProgressFill}
+                            style={{ 
+                              width: `${Math.min(100, (getUserPointsForWeek(currentUser, getWeekStart(new Date())) / Math.max(1, getQuotaWithAbsences(currentUser, getWeekStart(new Date())))) * 100)}%`,
+                              backgroundColor: getUserPointsForWeek(currentUser, getWeekStart(new Date())) >= getQuotaWithAbsences(currentUser, getWeekStart(new Date())) ? 'var(--color-success)' : 'var(--color-primary)'
+                            }}
+                          />
+                        </div>
+                        <div className={styles.mobileGoalDetails}>
+                          <span>
+                            {getUserPointsForWeek(currentUser, getWeekStart(new Date())) >= getQuotaWithAbsences(currentUser, getWeekStart(new Date())) 
+                              ? '✅ Objectif atteint !' 
+                              : `${getQuotaWithAbsences(currentUser, getWeekStart(new Date())) - getUserPointsForWeek(currentUser, getWeekStart(new Date()))} pts restants`
+                            }
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Leaderboard */}
                   <div className={styles.mobileLeaderboard}>
                     {users.sort((a, b) => (getUserTotalPoints(b.id) - getUserTotalPoints(a.id))).map((user, idx) => (
-                      <div key={user.id} className={`${styles.mobileLeaderItem} ${idx === 0 ? styles.mobileLeaderFirst : ''}`}>
+                      <div key={user.id} className={`${styles.mobileLeaderItem} ${idx === 0 ? styles.mobileLeaderFirst : ''} ${user.id === currentUser ? styles.mobileLeaderMe : ''}`}>
                         <span className={styles.mobileLeaderRank}>#{idx + 1}</span>
                         <div 
                           className={styles.mobileLeaderAvatar}
@@ -4206,7 +4304,7 @@ export default function PlannerPage() {
                         >
                           {user.name.charAt(0)}
                         </div>
-                        <span className={styles.mobileLeaderName}>{user.name}</span>
+                        <span className={styles.mobileLeaderName}>{user.name} {user.id === currentUser && '(moi)'}</span>
                         <span className={styles.mobileLeaderPoints}>{getUserTotalPoints(user.id)} pts</span>
                       </div>
                     ))}
@@ -4246,16 +4344,126 @@ export default function PlannerPage() {
                     />
                   </div>
 
+                  {/* Mobile Task Creation Form */}
+                  <div className={styles.mobileCreateTaskCard}>
+                    <h4 className={styles.mobileCreateTitle}>
+                      <Icon name="plus" size={14} />
+                      Nouvelle tâche
+                    </h4>
+                    <input
+                      type="text"
+                      className={styles.mobileInput}
+                      placeholder="Nom de la tâche"
+                      value={newTask.title}
+                      onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                    />
+                    <div className={styles.mobileInputRow}>
+                      <div className={styles.mobileInputGroup}>
+                        <label>Durée (min)</label>
+                        <input
+                          type="number"
+                          className={styles.mobileInputSmall}
+                          value={newTask.duration}
+                          onChange={(e) => setNewTask({ ...newTask, duration: parseInt(e.target.value) || 0 })}
+                          min={5}
+                          max={240}
+                        />
+                      </div>
+                      <div className={styles.mobileInputGroup}>
+                        <label>Pénibilité</label>
+                        <input
+                          type="number"
+                          className={styles.mobileInputSmall}
+                          value={newTask.penibility}
+                          onChange={(e) => setNewTask({ ...newTask, penibility: parseInt(e.target.value) || 0 })}
+                          min={1}
+                          max={100}
+                        />
+                      </div>
+                    </div>
+                    <div className={styles.mobileInputRow}>
+                      <select
+                        className={styles.mobileSelect}
+                        value={newTaskDay}
+                        onChange={(e) => setNewTaskDay(e.target.value)}
+                      >
+                        {dayOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <input
+                        type="time"
+                        className={styles.mobileInputSmall}
+                        value={newTaskTime}
+                        onChange={(e) => setNewTaskTime(e.target.value)}
+                      />
+                    </div>
+                    <button className={styles.mobileCreateBtn} onClick={addTask}>
+                      <Icon name="plus" size={16} />
+                      Créer la tâche
+                    </button>
+                    {paramMessage && <p className={styles.mobileError}>{paramMessage}</p>}
+                  </div>
+
+                  {/* Task List with Edit/Delete */}
                   <div className={styles.mobileTaskList}>
-                    {tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).slice(0, 10).map((task) => (
-                      <div key={task.id} className={styles.mobileTaskItemFull}>
-                        <div className={styles.mobileTaskLeft}>
-                          <span className={styles.mobileTaskTitle}>{task.title}</span>
-                          <span className={styles.mobileTaskMeta}>
-                            {task.duration} min · Pénibilité {task.penibility}%
-                          </span>
-                        </div>
-                        <span className={styles.mobileTaskBadge}>{calculateTaskPoints(task)} pts</span>
+                    {tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).map((task) => (
+                      <div key={task.id} className={styles.mobileTaskItemEditable}>
+                        {editingTaskId === task.id ? (
+                          // Edit Mode
+                          <div className={styles.mobileEditForm}>
+                            <input
+                              type="text"
+                              className={styles.mobileInput}
+                              value={editTaskDraft.title}
+                              onChange={(e) => setEditTaskDraft({ ...editTaskDraft, title: e.target.value })}
+                            />
+                            <div className={styles.mobileInputRow}>
+                              <input
+                                type="number"
+                                className={styles.mobileInputSmall}
+                                value={editTaskDraft.duration}
+                                onChange={(e) => setEditTaskDraft({ ...editTaskDraft, duration: parseInt(e.target.value) || 0 })}
+                                min={5}
+                                max={240}
+                              />
+                              <input
+                                type="number"
+                                className={styles.mobileInputSmall}
+                                value={editTaskDraft.penibility}
+                                onChange={(e) => setEditTaskDraft({ ...editTaskDraft, penibility: parseInt(e.target.value) || 0 })}
+                                min={1}
+                                max={100}
+                              />
+                            </div>
+                            <div className={styles.mobileEditActions}>
+                              <button className={styles.mobileSaveBtn} onClick={saveEditTask}>
+                                <Icon name="check" size={14} />
+                                Sauver
+                              </button>
+                              <button className={styles.mobileCancelBtn} onClick={cancelEditTask}>
+                                <Icon name="x" size={14} />
+                              </button>
+                            </div>
+                          </div>
+                        ) : (
+                          // View Mode
+                          <>
+                            <div className={styles.mobileTaskLeft}>
+                              <span className={styles.mobileTaskTitle}>{task.title}</span>
+                              <span className={styles.mobileTaskMeta}>
+                                {task.duration} min · Pénibilité {task.penibility}%
+                              </span>
+                            </div>
+                            <div className={styles.mobileTaskBtns}>
+                              <span className={styles.mobileTaskBadge}>{calculateTaskPoints(task)} pts</span>
+                              <button className={styles.mobileEditBtn} onClick={() => startEditTask(task)}>
+                                <Icon name="pen" size={14} />
+                              </button>
+                              <button className={styles.mobileDeleteBtn} onClick={() => deleteTask(task.id)}>
+                                <Icon name="trash" size={14} />
+                              </button>
+                            </div>
+                          </>
+                        )}
                       </div>
                     ))}
                   </div>
