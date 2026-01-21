@@ -57,6 +57,7 @@ export function SplashScreen() {
         style={{
           width: 120,
           height: 120,
+          objectFit: "contain",
           animation: "pulse 1.5s ease-in-out infinite",
         }}
       />

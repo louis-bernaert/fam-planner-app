@@ -10,6 +10,12 @@
   "scope": "/",
   "icons": [
     {
+      "src": "/icon-iphone.png",
+      "sizes": "180x180",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
       "src": "/logo/logo_sans_nom_couleur.png",
       "sizes": "512x512",
       "type": "image/png",

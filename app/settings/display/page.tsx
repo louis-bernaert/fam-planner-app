@@ -170,12 +170,6 @@ export default function DisplaySettingsPage() {
           {saved ? "Enregistré !" : "Enregistrer les préférences"}
         </button>
       </div>
-
-      <div className={styles.backLinkArrow}>
-        <Link href="/settings">
-          <Icon name="arrowLeft" size={20} />
-        </Link>
-      </div>
     </div>
   );
 }

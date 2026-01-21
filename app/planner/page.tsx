@@ -234,6 +234,7 @@ export default function PlannerPage() {
   const [mobileNewTaskSchedules, setMobileNewTaskSchedules] = useState<string[]>([]);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<Date | null>(new Date());
   const [mobileCalendarView, setMobileCalendarView] = useState<'month' | 'week' | 'day'>('month');
+  const [mobileShowTaskForm, setMobileShowTaskForm] = useState(false);
 
   // Theme state
   const [theme, setTheme] = useState<Theme>(() => {
@@ -4175,6 +4176,64 @@ export default function PlannerPage() {
                       )}
                     </div>
                   )}
+
+                  {/* Exceptional Task */}
+                  <div className={styles.mobileSection}>
+                    <h3 className={styles.mobileSectionTitle}>
+                      <Icon name="star" size={16} />
+                      Tâche exceptionnelle
+                    </h3>
+                    <div className={styles.mobileExceptionalForm}>
+                      <input
+                        type="text"
+                        className={styles.mobileInput}
+                        placeholder="Nom de la tâche"
+                        value={newExceptionalTask.title}
+                        onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, title: e.target.value }))}
+                      />
+                      <div className={styles.mobileInputRowEqual}>
+                        <div className={styles.mobileInputGroupCompact}>
+                          <label>Durée</label>
+                          <div className={styles.mobileInputWithUnit}>
+                            <input
+                              type="number"
+                              value={newExceptionalTask.duration || ''}
+                              onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, duration: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
+                              min={5}
+                              max={240}
+                            />
+                            <span>min</span>
+                          </div>
+                        </div>
+                        <div className={styles.mobileInputGroupCompact}>
+                          <label>Pénibilité</label>
+                          <div className={styles.mobileInputWithUnit}>
+                            <input
+                              type="number"
+                              value={newExceptionalTask.penibility || ''}
+                              onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, penibility: e.target.value === '' ? 0 : parseInt(e.target.value) }))}
+                              min={1}
+                              max={100}
+                            />
+                            <span>%</span>
+                          </div>
+                        </div>
+                      </div>
+                      <div className={styles.mobileExceptionalFooter}>
+                        <span className={styles.mobileExceptionalPoints}>
+                          +{Math.round((newExceptionalTask.duration * newExceptionalTask.penibility) / 10)} pts
+                        </span>
+                        <button 
+                          className={styles.mobileCreateBtnSmall}
+                          onClick={addExceptionalTask}
+                          disabled={!newExceptionalTask.title.trim()}
+                        >
+                          <Icon name="plus" size={14} />
+                          Ajouter
+                        </button>
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
 
@@ -4225,19 +4284,19 @@ export default function PlannerPage() {
                           const currentDay = selectedMobileDay || new Date();
                           const assignment = getTaskAssignment(item.task.id, currentDay);
                           const isMyTask = assignment?.userId === currentUser;
-                          const isAssigned = !!assignment;
+                          const isAssigned = !!assignment?.userId;
                           
                           return (
                             <div key={`day-task-${idx}`} className={styles.mobileTaskItemExpanded}>
                               <div className={styles.mobileTaskRow}>
                                 <div 
                                   className={styles.mobileTaskColor}
-                                  style={{ backgroundColor: isAssigned ? `hsl(${(users.findIndex(u => u.id === item.member?.id) * 60) % 360}, 60%, 50%)` : 'var(--color-muted)' }}
+                                  style={{ backgroundColor: isAssigned ? `hsl(${(users.findIndex(u => u.id === assignment?.userId) * 60) % 360}, 60%, 50%)` : 'var(--color-muted)' }}
                                 />
                                 <div className={styles.mobileTaskLeft}>
                                   <span className={styles.mobileTaskTitle}>{item.task.title}</span>
                                   <span className={styles.mobileTaskMeta}>
-                                    {item.timeSlot} · {item.member?.name || 'Libre'}
+                                    {item.timeSlot} · {isAssigned ? users.find(u => u.id === assignment?.userId)?.name || 'Inconnu' : 'Libre'}
                                   </span>
                                 </div>
                                 <span className={styles.mobileTaskPoints}>+{item.points}</span>
@@ -4261,7 +4320,7 @@ export default function PlannerPage() {
                                   </button>
                                 ) : (
                                   <span className={styles.mobileAssignedLabel}>
-                                    Pris par {item.member?.name}
+                                    Pris par {users.find(u => u.id === assignment?.userId)?.name}
                                   </span>
                                 )}
                               </div>
@@ -4306,7 +4365,7 @@ export default function PlannerPage() {
                         <div className={styles.mobileGoalDetails}>
                           <span>
                             {getUserPointsForWeek(currentUser, getWeekStart(new Date())) >= getQuotaWithAbsences(currentUser, getWeekStart(new Date())) 
-                              ? '✅ Objectif atteint !' 
+                              ? <><Icon name="check" size={14} style={{ color: 'var(--color-success)', marginRight: '4px' }} />Objectif atteint !</>
                               : `${getQuotaWithAbsences(currentUser, getWeekStart(new Date())) - getUserPointsForWeek(currentUser, getWeekStart(new Date()))} pts restants`
                             }
                           </span>
@@ -4374,121 +4433,138 @@ export default function PlannerPage() {
               {/* Mobile Tasks */}
               {activeTab === "taches" && (
                 <div className={styles.mobileTab}>
-                  <div className={styles.mobileSearchBar}>
-                    <Icon name="search" size={16} />
-                    <input 
-                      type="text" 
-                      placeholder="Rechercher une tâche..."
-                      value={taskSearch}
-                      onChange={(e) => setTaskSearch(e.target.value)}
-                    />
-                  </div>
-
-                  {/* Mobile Task Creation Form */}
-                  <div className={styles.mobileCreateTaskCard}>
-                    <h4 className={styles.mobileCreateTitle}>
-                      <Icon name="plus" size={14} />
-                      Nouvelle tâche
-                    </h4>
-                    <input
-                      type="text"
-                      className={styles.mobileInput}
-                      placeholder="Nom de la tâche"
-                      value={newTask.title}
-                      onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                    />
-                    <div className={styles.mobileInputRowEqual}>
-                      <div className={styles.mobileInputGroupCompact}>
-                        <label>Durée</label>
-                        <div className={styles.mobileInputWithUnit}>
-                          <input
-                            type="number"
-                            value={newTask.duration || ''}
-                            onChange={(e) => setNewTask({ ...newTask, duration: e.target.value === '' ? 0 : parseInt(e.target.value) })}
-                            min={5}
-                            max={240}
-                          />
-                          <span>min</span>
-                        </div>
-                      </div>
-                      <div className={styles.mobileInputGroupCompact}>
-                        <label>Pénibilité</label>
-                        <div className={styles.mobileInputWithUnit}>
-                          <input
-                            type="number"
-                            value={newTask.penibility || ''}
-                            onChange={(e) => setNewTask({ ...newTask, penibility: e.target.value === '' ? 0 : parseInt(e.target.value) })}
-                            min={1}
-                            max={100}
-                          />
-                          <span>%</span>
-                        </div>
-                      </div>
+                  {/* Header with + button */}
+                  <div className={styles.mobileTasksHeader}>
+                    <div className={styles.mobileSearchBar}>
+                      <Icon name="search" size={16} />
+                      <input 
+                        type="text" 
+                        placeholder="Rechercher une tâche..."
+                        value={taskSearch}
+                        onChange={(e) => setTaskSearch(e.target.value)}
+                      />
                     </div>
-                    
-                    {/* Schedule slots */}
-                    <div className={styles.mobileScheduleSection}>
-                      <label className={styles.mobileScheduleLabel}>Créneaux</label>
-                      <div className={styles.mobileScheduleAdd}>
-                        <select
-                          className={styles.mobileSelectCompact}
-                          value={newTaskDay}
-                          onChange={(e) => setNewTaskDay(e.target.value)}
-                        >
-                          {dayOptions.map(d => <option key={d} value={d}>{d}</option>)}
-                        </select>
-                        <input
-                          type="time"
-                          className={styles.mobileTimeInput}
-                          value={newTaskTime}
-                          onChange={(e) => setNewTaskTime(e.target.value)}
-                        />
-                        <button 
-                          className={styles.mobileAddScheduleBtn}
-                          onClick={() => {
-                            const slot = `${newTaskDay} · ${newTaskTime}`;
-                            if (!mobileNewTaskSchedules.includes(slot)) {
-                              setMobileNewTaskSchedules([...mobileNewTaskSchedules, slot]);
-                            }
-                          }}
-                        >
-                          <Icon name="plus" size={14} />
-                        </button>
-                      </div>
-                      {mobileNewTaskSchedules.length > 0 && (
-                        <div className={styles.mobileScheduleList}>
-                          {mobileNewTaskSchedules.map((slot, idx) => (
-                            <div key={idx} className={styles.mobileScheduleChip}>
-                              <span>{slot}</span>
-                              <button onClick={() => setMobileNewTaskSchedules(mobileNewTaskSchedules.filter((_, i) => i !== idx))}>
-                                <Icon name="x" size={10} />
-                              </button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                    
                     <button 
-                      className={styles.mobileCreateBtnFull} 
-                      onClick={() => {
-                        if (mobileNewTaskSchedules.length > 0) {
-                          setNewTaskSchedules(mobileNewTaskSchedules);
-                        }
-                        addTask();
-                        setMobileNewTaskSchedules([]);
-                      }}
+                      className={`${styles.mobileAddTaskBtn} ${mobileShowTaskForm ? styles.mobileAddTaskBtnActive : ''}`}
+                      onClick={() => setMobileShowTaskForm(!mobileShowTaskForm)}
                     >
-                      <Icon name="plus" size={16} />
-                      Créer la tâche
+                      <Icon name={mobileShowTaskForm ? "x" : "plus"} size={20} />
                     </button>
-                    {paramMessage && <p className={styles.mobileError}>{paramMessage}</p>}
                   </div>
 
-                  {/* Task List with Edit/Delete */}
-                  <div className={styles.mobileTaskList}>
-                    {tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).map((task) => (
-                      <div key={task.id} className={styles.mobileTaskItemCompact}>
+                  {/* Mobile Task Creation Form (collapsible) */}
+                  {mobileShowTaskForm && (
+                    <div className={styles.mobileCreateTaskCard}>
+                      <h4 className={styles.mobileCreateTitle}>
+                        <Icon name="plus" size={14} />
+                        Nouvelle tâche
+                      </h4>
+                      <input
+                        type="text"
+                        className={styles.mobileInput}
+                        placeholder="Nom de la tâche"
+                        value={newTask.title}
+                        onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
+                      />
+                      <div className={styles.mobileInputRowEqual}>
+                        <div className={styles.mobileInputGroupCompact}>
+                          <label>Durée</label>
+                          <div className={styles.mobileInputWithUnit}>
+                            <input
+                              type="number"
+                              value={newTask.duration || ''}
+                              onChange={(e) => setNewTask({ ...newTask, duration: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                              min={5}
+                              max={240}
+                            />
+                            <span>min</span>
+                          </div>
+                        </div>
+                        <div className={styles.mobileInputGroupCompact}>
+                          <label>Pénibilité</label>
+                          <div className={styles.mobileInputWithUnit}>
+                            <input
+                              type="number"
+                              value={newTask.penibility || ''}
+                              onChange={(e) => setNewTask({ ...newTask, penibility: e.target.value === '' ? 0 : parseInt(e.target.value) })}
+                              min={1}
+                              max={100}
+                            />
+                            <span>%</span>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Schedule slots */}
+                      <div className={styles.mobileScheduleSection}>
+                        <label className={styles.mobileScheduleLabel}>Créneaux</label>
+                        <div className={styles.mobileScheduleAdd}>
+                          <select
+                            className={styles.mobileSelectCompact}
+                            value={newTaskDay}
+                            onChange={(e) => setNewTaskDay(e.target.value)}
+                          >
+                            {dayOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                          </select>
+                          <input
+                            type="time"
+                            className={styles.mobileTimeInput}
+                            value={newTaskTime}
+                            onChange={(e) => setNewTaskTime(e.target.value)}
+                          />
+                          <button 
+                            className={styles.mobileAddScheduleBtn}
+                            onClick={() => {
+                              const slot = `${newTaskDay} · ${newTaskTime}`;
+                              if (!mobileNewTaskSchedules.includes(slot)) {
+                                setMobileNewTaskSchedules([...mobileNewTaskSchedules, slot]);
+                              }
+                            }}
+                          >
+                            <Icon name="plus" size={14} />
+                          </button>
+                        </div>
+                        {mobileNewTaskSchedules.length > 0 && (
+                          <div className={styles.mobileScheduleList}>
+                            {mobileNewTaskSchedules.map((slot, idx) => (
+                              <div key={idx} className={styles.mobileScheduleChip}>
+                                <span>{slot}</span>
+                                <button onClick={() => setMobileNewTaskSchedules(mobileNewTaskSchedules.filter((_, i) => i !== idx))}>
+                                  <Icon name="x" size={10} />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      
+                      <button 
+                        className={styles.mobileCreateBtnFull} 
+                        onClick={() => {
+                          if (mobileNewTaskSchedules.length > 0) {
+                            setNewTaskSchedules(mobileNewTaskSchedules);
+                          }
+                          addTask();
+                          setMobileNewTaskSchedules([]);
+                          setMobileShowTaskForm(false);
+                        }}
+                      >
+                        <Icon name="plus" size={16} />
+                        Créer la tâche
+                      </button>
+                      {paramMessage && <p className={styles.mobileError}>{paramMessage}</p>}
+                    </div>
+                  )}
+
+                  {/* All Tasks List */}
+                  <div className={styles.mobileSection}>
+                    <h3 className={styles.mobileSectionTitle}>
+                      <Icon name="clipboardList" size={16} />
+                      Toutes les tâches ({tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).length})
+                    </h3>
+                    <div className={styles.mobileTaskList}>
+                      {tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).map((task) => (
+                        <div key={task.id} className={styles.mobileTaskItemCompact}>
                         {editingTaskId === task.id ? (
                           // Edit Mode
                           <div className={styles.mobileEditForm}>
@@ -4589,6 +4665,7 @@ export default function PlannerPage() {
                         )}
                       </div>
                     ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -4691,6 +4768,40 @@ export default function PlannerPage() {
                     </div>
                   )}
 
+                  {/* Selected Day Events (for month view) */}
+                  {mobileCalendarView === 'month' && selectedCalendarDay && (
+                    <div className={styles.mobileSelectedDayEvents}>
+                      <h4 className={styles.mobileSelectedDayTitle}>
+                        {selectedCalendarDay.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      </h4>
+                      {getEventsForDate(selectedCalendarDay).length === 0 ? (
+                        <p className={styles.mobileEmptyState}>Aucune indisponibilité ce jour</p>
+                      ) : (
+                        <div className={styles.mobileSelectedDayList}>
+                          {getEventsForDate(selectedCalendarDay).map((event, idx) => {
+                            const member = calendarMembers.find(m => m.userId === event.userId);
+                            const user = users.find(u => u.id === event.userId);
+                            return (
+                              <div key={idx} className={styles.mobileDayEvent}>
+                                <div 
+                                  className={styles.mobileDayEventColor}
+                                  style={{ backgroundColor: member?.color || `hsl(${(users.findIndex(u => u.id === event.userId) * 60) % 360}, 60%, 50%)` }}
+                                />
+                                <div className={styles.mobileDayEventInfo}>
+                                  <span className={styles.mobileDayEventTitle}>{event.summary}</span>
+                                  <span className={styles.mobileDayEventTime}>
+                                    {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                                  </span>
+                                  {user && <span className={styles.mobileDayEventUser}>{user.name}</span>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
+
                   {/* Week View */}
                   {mobileCalendarView === 'week' && (
                     <div className={styles.mobileWeekView}>
@@ -4704,8 +4815,13 @@ export default function PlannerPage() {
                         return days.map((day, idx) => {
                           const dayEvents = getEventsForDate(day);
                           const isToday = day.toDateString() === new Date().toDateString();
+                          const isSelected = selectedCalendarDay && day.toDateString() === selectedCalendarDay.toDateString();
                           return (
-                            <div key={idx} className={`${styles.mobileWeekDay} ${isToday ? styles.mobileWeekDayToday : ''}`}>
+                            <button 
+                              key={idx} 
+                              className={`${styles.mobileWeekDay} ${isToday ? styles.mobileWeekDayToday : ''} ${isSelected ? styles.mobileWeekDaySelected : ''}`}
+                              onClick={() => setSelectedCalendarDay(day)}
+                            >
                               <div className={styles.mobileWeekDayHeader}>
                                 <span className={styles.mobileWeekDayName}>{day.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
                                 <span className={styles.mobileWeekDayNum}>{day.getDate()}</span>
@@ -4725,10 +4841,44 @@ export default function PlannerPage() {
                                 })}
                                 {dayEvents.length > 3 && <span className={styles.mobileWeekMore}>+{dayEvents.length - 3}</span>}
                               </div>
-                            </div>
+                            </button>
                           );
                         });
                       })()}
+                    </div>
+                  )}
+
+                  {/* Selected Day Events (for week view) */}
+                  {mobileCalendarView === 'week' && selectedCalendarDay && (
+                    <div className={styles.mobileSelectedDayEvents}>
+                      <h4 className={styles.mobileSelectedDayTitle}>
+                        {selectedCalendarDay.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      </h4>
+                      {getEventsForDate(selectedCalendarDay).length === 0 ? (
+                        <p className={styles.mobileEmptyState}>Aucune indisponibilité ce jour</p>
+                      ) : (
+                        <div className={styles.mobileSelectedDayList}>
+                          {getEventsForDate(selectedCalendarDay).map((event, idx) => {
+                            const member = calendarMembers.find(m => m.userId === event.userId);
+                            const user = users.find(u => u.id === event.userId);
+                            return (
+                              <div key={idx} className={styles.mobileDayEvent}>
+                                <div 
+                                  className={styles.mobileDayEventColor}
+                                  style={{ backgroundColor: member?.color || `hsl(${(users.findIndex(u => u.id === event.userId) * 60) % 360}, 60%, 50%)` }}
+                                />
+                                <div className={styles.mobileDayEventInfo}>
+                                  <span className={styles.mobileDayEventTitle}>{event.summary}</span>
+                                  <span className={styles.mobileDayEventTime}>
+                                    {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                                  </span>
+                                  {user && <span className={styles.mobileDayEventUser}>{user.name}</span>}
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
                   )}
 
