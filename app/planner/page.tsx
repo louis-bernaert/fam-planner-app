@@ -2581,76 +2581,119 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
     
     // ===== ALGORITHME D'AUTO-ATTRIBUTION INTELLIGENT =====
-    // Utilise les coûts normalisés basés sur les évaluations personnelles
+    // Attribue les tâches pour les 7 prochains jours
     
     const normalizedCosts = calculateNormalizedCosts();
-    const updated: Assignment[] = [];
+    const newAssignments: { taskId: string; userId: string; date: string; key: string }[] = [];
     
-    // Charge actuelle par utilisateur (en points)
-    const currentLoad = new Map<string, number>();
-    familyUsers.forEach((u) => currentLoad.set(u.id, 0));
+    // Charge actuelle par utilisateur (en points) pour la semaine
+    const weeklyLoad = new Map<string, number>();
+    familyUsers.forEach((u) => weeklyLoad.set(u.id, 0));
 
-    // Cible équitable: total des points / nombre d'utilisateurs actifs
-    const totalPoints = familyTasks.reduce((sum, t) => sum + calculateTaskPoints(t), 0);
-    const targetPerUser = totalPoints / familyUsers.length;
-    
-    // Lambda pour la pénalité de surcharge
+    // Calculer le total des points pour la semaine pour équilibrer
+    let totalWeeklyPoints = 0;
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const date = new Date();
+      date.setDate(date.getDate() + dayOffset);
+      const tasksForDay = getTasksForDay(date);
+      tasksForDay.forEach(task => {
+        totalWeeklyPoints += calculateTaskPoints(task);
+      });
+    }
+    const targetPerUser = totalWeeklyPoints / familyUsers.length;
     const lambda = 2.0;
 
-    // Trier les tâches par valeur décroissante (grosses tâches d'abord)
-    const sortedTasks = [...familyTasks].sort((a, b) => calculateTaskPoints(b) - calculateTaskPoints(a));
-
-    sortedTasks.forEach((task) => {
-      const primarySlot = task.schedules?.[0] ?? task.slot;
+    // Pour chaque jour des 7 prochains jours
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const date = new Date();
+      date.setDate(date.getDate() + dayOffset);
+      date.setHours(0, 0, 0, 0);
       
-      // Candidats éligibles (non indisponibles sur ce créneau)
-      const candidates = familyUsers.filter((u) => !u.unavailable.includes(primarySlot));
-      if (!candidates.length) return;
-
-      // Calculer le score de décision pour chaque candidat
-      const taskPoints = calculateTaskPoints(task);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
       
-      const scored = candidates.map(user => {
-        const costEntry = normalizedCosts.find(c => c.userId === user.id && c.taskId === task.id);
-        const personalCost = costEntry?.cost ?? 0.5;
-        
-        // Pénalité de surcharge: si on dépasse la cible
-        const userLoad = currentLoad.get(user.id) ?? 0;
-        const overTarget = Math.max(0, (userLoad + taskPoints) - targetPerUser);
-        const overloadPenalty = overTarget / targetPerUser; // Normalisé
-        
-        // Score final = coût personnel + lambda * pénalité de surcharge
-        const decisionScore = personalCost + lambda * overloadPenalty;
-        
-        return { user, personalCost, decisionScore };
+      // Récupérer les tâches pour ce jour
+      const tasksForDay = getTasksForDay(date);
+      
+      // Filtrer les tâches non encore assignées ce jour
+      const unassignedTasks = tasksForDay.filter(task => {
+        const key = `${task.id}_${dateStr}`;
+        const existing = taskAssignments[key];
+        return !existing || existing.userIds.length === 0;
       });
 
-      // Choisir celui avec le plus petit score de décision
-      scored.sort((a, b) => a.decisionScore - b.decisionScore);
-      const picked = scored[0].user;
-      
-      // Mettre à jour la charge
-      currentLoad.set(picked.id, (currentLoad.get(picked.id) ?? 0) + taskPoints);
-      updated.push({ taskId: task.id, userId: picked.id });
-    });
+      // Trier les tâches par points décroissants
+      const sortedTasks = [...unassignedTasks].sort((a, b) => calculateTaskPoints(b) - calculateTaskPoints(a));
 
-    if (updated.length === 0) {
-      setToastMessage({ type: 'error', text: 'Aucune attribution possible (vérifiez les disponibilités)' });
+      sortedTasks.forEach((task) => {
+        const timeSlot = getTaskTimeSlot(task, date);
+        
+        // Candidats éligibles (non occupés sur ce créneau ce jour)
+        const candidates = familyUsers.filter((u) => {
+          // Vérifier indisponibilités récurrentes
+          if (u.unavailable.includes(timeSlot)) return false;
+          // Vérifier calendrier (événements)
+          if (isUserBusyAtTime(u.id, date, timeSlot)) return false;
+          return true;
+        });
+        
+        if (!candidates.length) return;
+
+        const taskPoints = calculateTaskPoints(task);
+        
+        const scored = candidates.map(user => {
+          const costEntry = normalizedCosts.find(c => c.userId === user.id && c.taskId === task.id);
+          const personalCost = costEntry?.cost ?? 0.5;
+          
+          const userLoad = weeklyLoad.get(user.id) ?? 0;
+          const overTarget = Math.max(0, (userLoad + taskPoints) - targetPerUser);
+          const overloadPenalty = targetPerUser > 0 ? overTarget / targetPerUser : 0;
+          
+          const decisionScore = personalCost + lambda * overloadPenalty;
+          
+          return { user, personalCost, decisionScore };
+        });
+
+        scored.sort((a, b) => a.decisionScore - b.decisionScore);
+        const picked = scored[0].user;
+        
+        weeklyLoad.set(picked.id, (weeklyLoad.get(picked.id) ?? 0) + taskPoints);
+        
+        const key = `${task.id}_${dateStr}`;
+        newAssignments.push({ taskId: task.id, userId: picked.id, date: dateStr, key });
+      });
+    }
+
+    if (newAssignments.length === 0) {
+      setToastMessage({ type: 'error', text: 'Aucune tâche à attribuer (toutes déjà assignées ou indisponibilités)' });
       return;
     }
 
-    const createAssignmentsInDB = async () => {
+    // Sauvegarder les attributions
+    const saveAssignments = async () => {
       try {
         let successCount = 0;
         let errorCount = 0;
         
-        for (const assignment of updated) {
-          const response = await fetch("/api/assignments", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              taskId: assignment.taskId,
-              userId: assignment.userId,
+        // Mise à jour locale immédiate
+        const localUpdates: Record<string, { date: string; userIds: string[] }> = {};
+        
+        for (const assignment of newAssignments) {
+          localUpdates[assignment.key] = { 
+            date: assignment.date, 
+            userIds: [assignment.userId] 
+          };
+          
+          // Sauvegarde en base
+          const response = await fetch('/api/task-registrations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ 
+              taskId: assignment.taskId, 
+              userId: assignment.userId, 
+              date: assignment.date 
             }),
           });
           
@@ -2658,24 +2701,25 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             successCount++;
           } else {
             errorCount++;
-            console.error('Assignment failed for task:', assignment.taskId);
+            console.error('Registration failed:', assignment);
           }
         }
         
-        setAssignments(updated);
+        // Mettre à jour l'état local
+        setTaskAssignments(prev => ({ ...prev, ...localUpdates }));
         
         if (errorCount === 0) {
-          setToastMessage({ type: 'success', text: `${successCount} tâche(s) attribuée(s) avec succès !` });
+          setToastMessage({ type: 'success', text: `${successCount} tâche(s) attribuée(s) pour la semaine !` });
         } else {
           setToastMessage({ type: 'error', text: `${successCount} réussie(s), ${errorCount} échec(s)` });
         }
       } catch (error) {
-        console.error("Failed to create assignments", error);
+        console.error("Failed to save assignments", error);
         setToastMessage({ type: 'error', text: 'Erreur lors de la sauvegarde des attributions' });
       }
     };
 
-    createAssignmentsInDB();
+    saveAssignments();
   }
 
   // Prévisualisation de l'auto-attribution avant validation
