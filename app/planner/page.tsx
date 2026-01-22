@@ -4738,6 +4738,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     </button>
                   </div>
 
+                  {/* Bouton Auto-attribution mobile */}
+                  <button 
+                    onClick={() => autoAssign()}
+                    className={styles.mobileAutoAssignBtn}
+                  >
+                    <Icon name="sparkles" size={16} />
+                    Auto-attribution
+                  </button>
+
                   {/* Day Pills */}
                   <div className={styles.mobileDayPills}>
                     {weekDays.map((day, idx) => {

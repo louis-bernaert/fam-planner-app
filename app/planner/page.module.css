@@ -4000,6 +4000,29 @@
   color: var(--color-text);
 }
 
+/* Mobile Auto-assign button */
+.mobileAutoAssignBtn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  width: 100%;
+  padding: var(--space-3);
+  margin: var(--space-3) 0;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: white;
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+}
+
+.mobileAutoAssignBtn:active {
+  transform: scale(0.98);
+}
+
 /* Mobile Day Pills */
 .mobileDayPills {
   display: flex;
