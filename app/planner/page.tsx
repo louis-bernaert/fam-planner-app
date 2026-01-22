@@ -264,6 +264,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const [showEvaluationModal, setShowEvaluationModal] = useState<string | null>(null); // taskId or null
   const [pendingEvaluation, setPendingEvaluation] = useState<{ duration: number; penibility: number }>({ duration: 30, penibility: 30 });
   const [showAutoAssignError, setShowAutoAssignError] = useState(false);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
   const [mobileCalendarView, setMobileCalendarView] = useState<'month' | 'week' | 'day'>('month');
   const [mobileShowTaskForm, setMobileShowTaskForm] = useState(false);
   const [mobileShowExceptionalForm, setMobileShowExceptionalForm] = useState(false);
@@ -305,6 +306,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       localStorage.setItem('weeklyHistory', JSON.stringify(weeklyHistory));
     }
   }, [weeklyHistory]);
+
+  // Auto-dismiss toast after 4 seconds
+  useEffect(() => {
+    if (toastMessage) {
+      const timer = setTimeout(() => setToastMessage(null), 4000);
+      return () => clearTimeout(timer);
+    }
+  }, [toastMessage]);
 
   const tabs = [
     { id: "monespace" as const, label: "Mon Espace", shortLabel: "Accueil", icon: "home" as const },
@@ -729,7 +738,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
   // Sauvegarder une évaluation
   const saveEvaluation = async (taskId: string, duration: number, penibility: number) => {
-    if (!currentUser) return;
+    if (!currentUser) {
+      setToastMessage({ type: 'error', text: 'Vous devez être connecté pour évaluer une tâche' });
+      return;
+    }
 
     const newEval: TaskEvaluation = { taskId, userId: currentUser, duration, penibility };
     
@@ -746,13 +758,21 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
     // Save to database
     try {
-      await fetch('/api/task-evaluations', {
+      const response = await fetch('/api/task-evaluations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(newEval),
       });
-    } catch (error) {
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error || 'Erreur serveur');
+      }
+      
+      setToastMessage({ type: 'success', text: 'Évaluation enregistrée !' });
+    } catch (error: any) {
       console.error('Failed to save evaluation', error);
+      setToastMessage({ type: 'error', text: `Erreur: ${error.message || 'Échec de la sauvegarde'}` });
     }
   };
 
@@ -2538,9 +2558,21 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   }
 
   function autoAssign() {
-    // ===== VÉRIFICATION DES ÉVALUATIONS =====
-    // Vérifier si l'utilisateur actuel a évalué toutes les tâches
-    if (!currentUser) return;
+    // ===== VÉRIFICATION DES PRÉREQUIS =====
+    if (!currentUser) {
+      setToastMessage({ type: 'error', text: 'Vous devez être connecté pour utiliser l\'auto-attribution' });
+      return;
+    }
+    
+    if (familyUsers.length === 0) {
+      setToastMessage({ type: 'error', text: 'Aucun membre dans la famille' });
+      return;
+    }
+    
+    if (familyTasks.length === 0) {
+      setToastMessage({ type: 'error', text: 'Aucune tâche à attribuer' });
+      return;
+    }
     
     const userEvalCount = getUserEvaluationCount(currentUser);
     if (userEvalCount < familyTasks.length) {
@@ -2602,10 +2634,18 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       updated.push({ taskId: task.id, userId: picked.id });
     });
 
+    if (updated.length === 0) {
+      setToastMessage({ type: 'error', text: 'Aucune attribution possible (vérifiez les disponibilités)' });
+      return;
+    }
+
     const createAssignmentsInDB = async () => {
       try {
+        let successCount = 0;
+        let errorCount = 0;
+        
         for (const assignment of updated) {
-          await fetch("/api/assignments", {
+          const response = await fetch("/api/assignments", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
@@ -2613,10 +2653,25 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               userId: assignment.userId,
             }),
           });
+          
+          if (response.ok) {
+            successCount++;
+          } else {
+            errorCount++;
+            console.error('Assignment failed for task:', assignment.taskId);
+          }
         }
+        
         setAssignments(updated);
+        
+        if (errorCount === 0) {
+          setToastMessage({ type: 'success', text: `${successCount} tâche(s) attribuée(s) avec succès !` });
+        } else {
+          setToastMessage({ type: 'error', text: `${successCount} réussie(s), ${errorCount} échec(s)` });
+        }
       } catch (error) {
         console.error("Failed to create assignments", error);
+        setToastMessage({ type: 'error', text: 'Erreur lors de la sauvegarde des attributions' });
       }
     };
 
@@ -5709,6 +5764,23 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               </button>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Toast notification */}
+      {toastMessage && (
+        <div 
+          className={`${styles.toast} ${toastMessage.type === 'success' ? styles.toastSuccess : styles.toastError}`}
+          onClick={() => setToastMessage(null)}
+        >
+          <Icon name={toastMessage.type === 'success' ? 'check' : 'warning'} size={18} />
+          <span>{toastMessage.text}</span>
+          <button 
+            className={styles.toastClose}
+            onClick={(e) => { e.stopPropagation(); setToastMessage(null); }}
+          >
+            <Icon name="xmark" size={14} />
+          </button>
         </div>
       )}
     </main>
