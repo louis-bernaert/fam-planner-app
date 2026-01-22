@@ -22,6 +22,7 @@ model User {
   assignments     Assignment[]
   registrations   TaskRegistration[]
   validations     TaskValidation[]
+  evaluations     TaskEvaluation[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
@@ -60,6 +61,7 @@ model Task {
   assignments   Assignment[]
   registrations TaskRegistration[]
   validations   TaskValidation[]
+  evaluations   TaskEvaluation[]
   createdAt     DateTime          @default(now())
 }
 
@@ -104,4 +106,19 @@ model Unavailability {
   userId  String
   slot    String
   user    User   @relation(fields: [userId], references: [id])
+}
+
+// Évaluation personnelle d'une tâche par un utilisateur
+model TaskEvaluation {
+  id          String   @id @default(cuid())
+  taskId      String
+  userId      String
+  duration    Int      // Durée estimée par l'utilisateur (minutes)
+  penibility  Int      // Pénibilité estimée par l'utilisateur (0-100)
+  task        Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user        User     @relation(fields: [userId], references: [id])
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([taskId, userId]) // Une seule évaluation par utilisateur/tâche
 }

@@ -73,6 +73,25 @@ type WeeklyHistory = {
   balance: number; // positif = surplus, négatif = déficit
 };
 
+// Évaluation personnelle d'une tâche par un utilisateur
+type TaskEvaluation = {
+  taskId: string;
+  userId: string;
+  duration: number;
+  penibility: number;
+};
+
+// Coût normalisé pour l'auto-attribution
+type NormalizedCost = {
+  userId: string;
+  taskId: string;
+  cost: number; // Coût final normalisé (0-1)
+  penRank: number;
+  durRank: number;
+  penRel: number;
+  durRel: number;
+};
+
 const features = [
   {
     title: "Tâches pondérées",
@@ -239,6 +258,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const [mobileSelectedUser, setMobileSelectedUser] = useState<string | null>(null);
   const [mobileNewTaskSchedules, setMobileNewTaskSchedules] = useState<string[]>([]);
   const [selectedCalendarDay, setSelectedCalendarDay] = useState<Date | null>(new Date());
+
+  // Task evaluations state
+  const [taskEvaluations, setTaskEvaluations] = useState<TaskEvaluation[]>([]);
+  const [showEvaluationModal, setShowEvaluationModal] = useState<string | null>(null); // taskId or null
+  const [pendingEvaluation, setPendingEvaluation] = useState<{ duration: number; penibility: number }>({ duration: 30, penibility: 30 });
   const [mobileCalendarView, setMobileCalendarView] = useState<'month' | 'week' | 'day'>('month');
   const [mobileShowTaskForm, setMobileShowTaskForm] = useState(false);
   const [mobileShowExceptionalForm, setMobileShowExceptionalForm] = useState(false);
@@ -639,19 +663,208 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   };
 
   const calculateTaskPoints = (task: Task) => {
-    // Points = durée × pénibilité / 10
-    const totalPoints = Math.round((task.duration * task.penibility) / 10);
-    return totalPoints;
+    // Calcul basé sur la MÉDIANE des évaluations (valeur collective)
+    const evals = taskEvaluations.filter(e => e.taskId === task.id);
+    
+    if (evals.length === 0) {
+      // Fallback: utiliser les valeurs par défaut de la tâche
+      return Math.round((task.duration * task.penibility) / 10);
+    }
+
+    // Calcul des médianes
+    const durations = evals.map(e => e.duration).sort((a, b) => a - b);
+    const penibilities = evals.map(e => e.penibility).sort((a, b) => a - b);
+    
+    const medianDuration = durations.length % 2 === 0
+      ? (durations[durations.length / 2 - 1] + durations[durations.length / 2]) / 2
+      : durations[Math.floor(durations.length / 2)];
+    
+    const medianPenibility = penibilities.length % 2 === 0
+      ? (penibilities[penibilities.length / 2 - 1] + penibilities[penibilities.length / 2]) / 2
+      : penibilities[Math.floor(penibilities.length / 2)];
+
+    return Math.round((medianDuration * medianPenibility) / 10);
   };
 
   // Détail du calcul pour affichage
   const getPointsBreakdown = (task: Task) => {
-    const totalPoints = Math.round((task.duration * task.penibility) / 10);
+    const evals = taskEvaluations.filter(e => e.taskId === task.id);
+    
+    if (evals.length === 0) {
+      return {
+        duration: task.duration,
+        penibility: task.penibility,
+        total: Math.round((task.duration * task.penibility) / 10),
+        isMedian: false,
+        evalCount: 0
+      };
+    }
+
+    const durations = evals.map(e => e.duration).sort((a, b) => a - b);
+    const penibilities = evals.map(e => e.penibility).sort((a, b) => a - b);
+    
+    const medianDuration = durations.length % 2 === 0
+      ? (durations[durations.length / 2 - 1] + durations[durations.length / 2]) / 2
+      : durations[Math.floor(durations.length / 2)];
+    
+    const medianPenibility = penibilities.length % 2 === 0
+      ? (penibilities[penibilities.length / 2 - 1] + penibilities[penibilities.length / 2]) / 2
+      : penibilities[Math.floor(penibilities.length / 2)];
+
     return {
-      duration: task.duration,
-      penibility: task.penibility,
-      total: totalPoints
+      duration: Math.round(medianDuration),
+      penibility: Math.round(medianPenibility),
+      total: Math.round((medianDuration * medianPenibility) / 10),
+      isMedian: true,
+      evalCount: evals.length
     };
+  };
+
+  // Obtenir l'évaluation de l'utilisateur actuel pour une tâche
+  const getMyEvaluation = (taskId: string) => {
+    if (!currentUser) return null;
+    return taskEvaluations.find(e => e.taskId === taskId && e.userId === currentUser) || null;
+  };
+
+  // Sauvegarder une évaluation
+  const saveEvaluation = async (taskId: string, duration: number, penibility: number) => {
+    if (!currentUser) return;
+
+    const newEval: TaskEvaluation = { taskId, userId: currentUser, duration, penibility };
+    
+    // Update local state
+    setTaskEvaluations(prev => {
+      const existing = prev.findIndex(e => e.taskId === taskId && e.userId === currentUser);
+      if (existing >= 0) {
+        const updated = [...prev];
+        updated[existing] = newEval;
+        return updated;
+      }
+      return [...prev, newEval];
+    });
+
+    // Save to database
+    try {
+      await fetch('/api/task-evaluations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(newEval),
+      });
+    } catch (error) {
+      console.error('Failed to save evaluation', error);
+    }
+  };
+
+  // ===== ALGORITHME D'AUTO-ATTRIBUTION INTELLIGENT =====
+  
+  // Calcul du percentile rank (robuste aux échelles différentes)
+  const calculatePercentileRank = (value: number, allValues: number[]): number => {
+    if (allValues.length <= 1) return 0.5;
+    const sorted = [...allValues].sort((a, b) => a - b);
+    const below = sorted.filter(v => v < value).length;
+    const equal = sorted.filter(v => v === value).length;
+    // Midrank pour ex-aequo
+    return (below + equal / 2) / allValues.length;
+  };
+
+  // Calcul de l'intensité relative (min-max normalization)
+  const calculateRelativeIntensity = (value: number, allValues: number[]): number => {
+    const min = Math.min(...allValues);
+    const max = Math.max(...allValues);
+    if (max === min) return 0.5; // Fallback si tout est pareil
+    return (value - min) / (max - min);
+  };
+
+  // Calcul des coûts normalisés pour tous les utilisateurs/tâches
+  const calculateNormalizedCosts = (): NormalizedCost[] => {
+    const costs: NormalizedCost[] = [];
+    const alpha = 0.7; // Poids du rang vs intensité pour pénibilité
+    const beta = 0.7;  // Poids du rang vs intensité pour durée
+
+    for (const user of familyUsers) {
+      const userEvals = taskEvaluations.filter(e => e.userId === user.id);
+      
+      // Skip si pas assez d'évaluations (< 3)
+      if (userEvals.length < 3) {
+        // Fallback: utiliser les valeurs par défaut avec coût médian
+        for (const task of familyTasks) {
+          costs.push({
+            userId: user.id,
+            taskId: task.id,
+            cost: 0.5, // Coût neutre
+            penRank: 0.5,
+            durRank: 0.5,
+            penRel: 0.5,
+            durRel: 0.5
+          });
+        }
+        continue;
+      }
+
+      const allPenibilities = userEvals.map(e => e.penibility);
+      const allDurations = userEvals.map(e => e.duration);
+
+      for (const task of familyTasks) {
+        const eval_ = userEvals.find(e => e.taskId === task.id);
+        
+        if (!eval_) {
+          // Pas d'évaluation pour cette tâche: coût neutre
+          costs.push({
+            userId: user.id,
+            taskId: task.id,
+            cost: 0.5,
+            penRank: 0.5,
+            durRank: 0.5,
+            penRel: 0.5,
+            durRel: 0.5
+          });
+          continue;
+        }
+
+        // Calcul rang (percentile)
+        const penRank = calculatePercentileRank(eval_.penibility, allPenibilities);
+        const durRank = calculatePercentileRank(eval_.duration, allDurations);
+
+        // Calcul intensité relative (min-max)
+        const penRel = calculateRelativeIntensity(eval_.penibility, allPenibilities);
+        const durRel = calculateRelativeIntensity(eval_.duration, allDurations);
+
+        // Fusion rang + intensité
+        const penFinal = alpha * penRank + (1 - alpha) * penRel;
+        const durFinal = beta * durRank + (1 - beta) * durRel;
+
+        // Coût final (multiplicatif)
+        const cost = penFinal * durFinal;
+
+        costs.push({
+          userId: user.id,
+          taskId: task.id,
+          cost,
+          penRank,
+          durRank,
+          penRel,
+          durRel
+        });
+      }
+    }
+
+    return costs;
+  };
+
+  // Vérifier combien de tâches un utilisateur a évaluées
+  const getUserEvaluationCount = (userId: string) => {
+    return taskEvaluations.filter(e => e.userId === userId).length;
+  };
+
+  // Vérifier si tous les utilisateurs ont évalué toutes les tâches
+  const getAllUsersEvaluationStatus = () => {
+    return familyUsers.map(user => ({
+      userId: user.id,
+      userName: user.name,
+      evaluated: taskEvaluations.filter(e => e.userId === user.id).length,
+      total: familyTasks.length,
+      complete: taskEvaluations.filter(e => e.userId === user.id).length >= familyTasks.length
+    }));
   };
 
   const getUserColor = (userId: string) => {
@@ -1490,6 +1703,25 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 });
               }
             }
+
+            // Load task evaluations (évaluations personnelles)
+            for (const family of familiesData) {
+              const evaluationsRes = await fetch(`/api/task-evaluations?familyId=${family.id}`);
+              if (evaluationsRes.ok) {
+                const evaluationsData = await evaluationsRes.json();
+                const loadedEvaluations: TaskEvaluation[] = evaluationsData.map((e: any) => ({
+                  taskId: e.taskId,
+                  userId: e.userId,
+                  duration: e.duration,
+                  penibility: e.penibility,
+                }));
+                setTaskEvaluations(prev => {
+                  const existing = new Set(prev.map(e => `${e.taskId}-${e.userId}`));
+                  const newOnes = loadedEvaluations.filter(e => !existing.has(`${e.taskId}-${e.userId}`));
+                  return [...prev, ...newOnes];
+                });
+              }
+            }
           }
         }
       } catch (error) {
@@ -2305,17 +2537,57 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   }
 
   function autoAssign() {
+    // ===== ALGORITHME D'AUTO-ATTRIBUTION INTELLIGENT =====
+    // Utilise les coûts normalisés basés sur les évaluations personnelles
+    
+    const normalizedCosts = calculateNormalizedCosts();
     const updated: Assignment[] = [];
-    const load = new Map<string, number>();
-    familyUsers.forEach((u) => load.set(u.id, 0));
+    
+    // Charge actuelle par utilisateur (en points)
+    const currentLoad = new Map<string, number>();
+    familyUsers.forEach((u) => currentLoad.set(u.id, 0));
 
-    familyTasks.forEach((task) => {
+    // Cible équitable: total des points / nombre d'utilisateurs actifs
+    const totalPoints = familyTasks.reduce((sum, t) => sum + calculateTaskPoints(t), 0);
+    const targetPerUser = totalPoints / familyUsers.length;
+    
+    // Lambda pour la pénalité de surcharge
+    const lambda = 2.0;
+
+    // Trier les tâches par valeur décroissante (grosses tâches d'abord)
+    const sortedTasks = [...familyTasks].sort((a, b) => calculateTaskPoints(b) - calculateTaskPoints(a));
+
+    sortedTasks.forEach((task) => {
       const primarySlot = task.schedules?.[0] ?? task.slot;
+      
+      // Candidats éligibles (non indisponibles sur ce créneau)
       const candidates = familyUsers.filter((u) => !u.unavailable.includes(primarySlot));
       if (!candidates.length) return;
-      candidates.sort((a, b) => (load.get(a.id) ?? 0) - (load.get(b.id) ?? 0) || a.points - b.points);
-      const picked = candidates[0];
-      load.set(picked.id, (load.get(picked.id) ?? 0) + task.duration + task.penibility);
+
+      // Calculer le score de décision pour chaque candidat
+      const taskPoints = calculateTaskPoints(task);
+      
+      const scored = candidates.map(user => {
+        const costEntry = normalizedCosts.find(c => c.userId === user.id && c.taskId === task.id);
+        const personalCost = costEntry?.cost ?? 0.5;
+        
+        // Pénalité de surcharge: si on dépasse la cible
+        const userLoad = currentLoad.get(user.id) ?? 0;
+        const overTarget = Math.max(0, (userLoad + taskPoints) - targetPerUser);
+        const overloadPenalty = overTarget / targetPerUser; // Normalisé
+        
+        // Score final = coût personnel + lambda * pénalité de surcharge
+        const decisionScore = personalCost + lambda * overloadPenalty;
+        
+        return { user, personalCost, decisionScore };
+      });
+
+      // Choisir celui avec le plus petit score de décision
+      scored.sort((a, b) => a.decisionScore - b.decisionScore);
+      const picked = scored[0].user;
+      
+      // Mettre à jour la charge
+      currentLoad.set(picked.id, (currentLoad.get(picked.id) ?? 0) + taskPoints);
       updated.push({ taskId: task.id, userId: picked.id });
     });
 
@@ -2339,6 +2611,66 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
     createAssignmentsInDB();
   }
+
+  // Prévisualisation de l'auto-attribution avant validation
+  const previewAutoAssign = () => {
+    const normalizedCosts = calculateNormalizedCosts();
+    const preview: { task: Task; userId: string; userName: string; cost: number; reason: string }[] = [];
+    
+    const currentLoad = new Map<string, number>();
+    familyUsers.forEach((u) => currentLoad.set(u.id, 0));
+
+    const totalPoints = familyTasks.reduce((sum, t) => sum + calculateTaskPoints(t), 0);
+    const targetPerUser = totalPoints / familyUsers.length;
+    const lambda = 2.0;
+
+    const sortedTasks = [...familyTasks].sort((a, b) => calculateTaskPoints(b) - calculateTaskPoints(a));
+
+    sortedTasks.forEach((task) => {
+      const primarySlot = task.schedules?.[0] ?? task.slot;
+      const candidates = familyUsers.filter((u) => !u.unavailable.includes(primarySlot));
+      if (!candidates.length) return;
+
+      const taskPoints = calculateTaskPoints(task);
+      
+      const scored = candidates.map(user => {
+        const costEntry = normalizedCosts.find(c => c.userId === user.id && c.taskId === task.id);
+        const personalCost = costEntry?.cost ?? 0.5;
+        const userLoad = currentLoad.get(user.id) ?? 0;
+        const overTarget = Math.max(0, (userLoad + taskPoints) - targetPerUser);
+        const overloadPenalty = overTarget / targetPerUser;
+        const decisionScore = personalCost + lambda * overloadPenalty;
+        
+        return { user, personalCost, decisionScore, overloadPenalty };
+      });
+
+      scored.sort((a, b) => a.decisionScore - b.decisionScore);
+      const winner = scored[0];
+      
+      currentLoad.set(winner.user.id, (currentLoad.get(winner.user.id) ?? 0) + taskPoints);
+      
+      let reason = '';
+      if (winner.personalCost < 0.3) {
+        reason = 'Trouve cette tâche facile';
+      } else if (winner.overloadPenalty === 0) {
+        reason = 'A de la capacité';
+      } else if (winner.personalCost < scored[scored.length - 1]?.personalCost - 0.2) {
+        reason = 'Préfère cette tâche';
+      } else {
+        reason = 'Équilibrage de charge';
+      }
+      
+      preview.push({
+        task,
+        userId: winner.user.id,
+        userName: winner.user.name,
+        cost: winner.personalCost,
+        reason
+      });
+    });
+
+    return preview;
+  };
 
   if (!currentUser) {
     return (
@@ -4623,6 +4955,18 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
                   {/* All Tasks List */}
                   <div className={styles.mobileSection}>
+                    {/* Evaluation Progress Banner */}
+                    {currentUser && (
+                      <div className={`${styles.mobileEvalBanner} ${getUserEvaluationCount(currentUser) >= tasks.length ? styles.mobileEvalBannerSuccess : ''}`}>
+                        <Icon name={getUserEvaluationCount(currentUser) >= tasks.length ? "check" : "sliders"} size={14} />
+                        <span>
+                          {getUserEvaluationCount(currentUser) >= tasks.length 
+                            ? "Vous avez évalué toutes les tâches ✓"
+                            : `Évaluations: ${getUserEvaluationCount(currentUser)}/${tasks.length} tâches`
+                          }
+                        </span>
+                      </div>
+                    )}
                     <h3 className={styles.mobileSectionTitle}>
                       <Icon name="clipboardList" size={16} />
                       Toutes les tâches ({tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).length})
@@ -4720,6 +5064,20 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             <span className={styles.mobileTaskTitleCompact}>{task.title}</span>
                             <span className={styles.mobileTaskMetaCompact}>{task.duration}min</span>
                             <span className={styles.mobileTaskBadgeSmall}>{calculateTaskPoints(task)}pts</span>
+                            <button 
+                              className={`${styles.mobileEvalBtnSmall} ${getMyEvaluation(task.id) ? styles.mobileEvalDone : ''}`}
+                              onClick={() => {
+                                const myEval = getMyEvaluation(task.id);
+                                setPendingEvaluation({
+                                  duration: myEval?.duration ?? task.duration,
+                                  penibility: myEval?.penibility ?? task.penibility
+                                });
+                                setShowEvaluationModal(task.id);
+                              }}
+                              title={getMyEvaluation(task.id) ? "Modifier mon évaluation" : "Évaluer cette tâche"}
+                            >
+                              <Icon name={getMyEvaluation(task.id) ? "check" : "sliders"} size={12} />
+                            </button>
                             <button className={styles.mobileEditBtnSmall} onClick={() => startEditTask(task)}>
                               <Icon name="pen" size={12} />
                             </button>
@@ -5058,6 +5416,78 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   >
                     Annuler
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Mobile Evaluation Modal */}
+            {showEvaluationModal && (
+              <div className={styles.mobileDelegationOverlay}>
+                <div className={styles.mobileEvaluationModal}>
+                  <h3 className={styles.mobileDelegationTitle}>
+                    Mon évaluation
+                    <span className={styles.mobileEvalSubtitle}>
+                      {tasks.find(t => t.id === showEvaluationModal)?.title}
+                    </span>
+                  </h3>
+                  <p className={styles.mobileEvalExplain}>
+                    Indiquez <strong>votre ressenti</strong> sur la durée et la pénibilité de cette tâche. Ces données servent à l'auto-attribution intelligente.
+                  </p>
+                  
+                  <div className={styles.mobileEvalInputs}>
+                    <div className={styles.mobileEvalInputGroup}>
+                      <label>Durée estimée</label>
+                      <div className={styles.mobileInputWithUnit}>
+                        <input
+                          type="number"
+                          value={pendingEvaluation.duration}
+                          onChange={(e) => setPendingEvaluation(prev => ({ ...prev, duration: parseInt(e.target.value) || 0 }))}
+                          min={5}
+                          max={240}
+                        />
+                        <span>min</span>
+                      </div>
+                    </div>
+                    <div className={styles.mobileEvalInputGroup}>
+                      <label>Pénibilité ressentie</label>
+                      <div className={styles.mobileInputWithUnit}>
+                        <input
+                          type="number"
+                          value={pendingEvaluation.penibility}
+                          onChange={(e) => setPendingEvaluation(prev => ({ ...prev, penibility: parseInt(e.target.value) || 0 }))}
+                          min={1}
+                          max={100}
+                        />
+                        <span>%</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className={styles.mobileEvalInfo}>
+                    <Icon name="info" size={14} />
+                    <span>
+                      Points collectifs calculés sur la <strong>médiane</strong> de toutes les évaluations
+                    </span>
+                  </div>
+
+                  <div className={styles.mobileEvalActions}>
+                    <button
+                      className={styles.mobileEvalSaveBtn}
+                      onClick={() => {
+                        saveEvaluation(showEvaluationModal, pendingEvaluation.duration, pendingEvaluation.penibility);
+                        setShowEvaluationModal(null);
+                      }}
+                    >
+                      <Icon name="check" size={16} />
+                      Enregistrer
+                    </button>
+                    <button
+                      className={styles.mobileDelegationCancel}
+                      onClick={() => setShowEvaluationModal(null)}
+                    >
+                      Annuler
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
