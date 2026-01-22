@@ -1186,6 +1186,103 @@
   background-color: var(--color-primary-hover);
 }
 
+/* Modal d'erreur auto-attribution */
+.autoAssignErrorModal {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  width: 100%;
+  max-width: 420px;
+  text-align: center;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.autoAssignErrorIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 64px;
+  height: 64px;
+  background-color: #fef3c7;
+  color: #d97706;
+  border-radius: var(--radius-full);
+  margin-bottom: var(--space-4);
+}
+
+.autoAssignErrorTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 var(--space-3) 0;
+}
+
+.autoAssignErrorText {
+  font-size: 0.9375rem;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-3) 0;
+  line-height: 1.5;
+}
+
+.autoAssignErrorCount {
+  font-size: 1.125rem;
+  color: var(--color-text);
+  margin: 0 0 var(--space-4) 0;
+  padding: var(--space-3);
+  background-color: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+}
+
+.autoAssignErrorExplain {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-5) 0;
+  line-height: 1.5;
+}
+
+.autoAssignErrorActions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.autoAssignErrorBtn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-5);
+  border: none;
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, #8b5cf6, #6366f1);
+  color: white;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.autoAssignErrorBtn:hover {
+  background: linear-gradient(135deg, #7c3aed, #4f46e5);
+  transform: translateY(-1px);
+}
+
+.autoAssignErrorCancel {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: transparent;
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.autoAssignErrorCancel:hover {
+  color: var(--color-text);
+  background-color: var(--color-bg-subtle);
+}
+
 .taskListHeader h4 {
   font-size: 1rem;
   font-weight: 600;

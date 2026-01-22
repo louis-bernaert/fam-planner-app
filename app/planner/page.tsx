@@ -263,6 +263,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const [taskEvaluations, setTaskEvaluations] = useState<TaskEvaluation[]>([]);
   const [showEvaluationModal, setShowEvaluationModal] = useState<string | null>(null); // taskId or null
   const [pendingEvaluation, setPendingEvaluation] = useState<{ duration: number; penibility: number }>({ duration: 30, penibility: 30 });
+  const [showAutoAssignError, setShowAutoAssignError] = useState(false);
   const [mobileCalendarView, setMobileCalendarView] = useState<'month' | 'week' | 'day'>('month');
   const [mobileShowTaskForm, setMobileShowTaskForm] = useState(false);
   const [mobileShowExceptionalForm, setMobileShowExceptionalForm] = useState(false);
@@ -2537,6 +2538,16 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   }
 
   function autoAssign() {
+    // ===== VÉRIFICATION DES ÉVALUATIONS =====
+    // Vérifier si l'utilisateur actuel a évalué toutes les tâches
+    if (!currentUser) return;
+    
+    const userEvalCount = getUserEvaluationCount(currentUser);
+    if (userEvalCount < familyTasks.length) {
+      setShowAutoAssignError(true);
+      return;
+    }
+    
     // ===== ALGORITHME D'AUTO-ATTRIBUTION INTELLIGENT =====
     // Utilise les coûts normalisés basés sur les évaluations personnelles
     
@@ -5655,6 +5666,46 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 onClick={() => setShowEvaluationModal(null)}
               >
                 Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Modal d'erreur auto-attribution */}
+      {showAutoAssignError && (
+        <div className={styles.modalOverlay} onClick={() => setShowAutoAssignError(false)}>
+          <div className={styles.autoAssignErrorModal} onClick={e => e.stopPropagation()}>
+            <div className={styles.autoAssignErrorIcon}>
+              <Icon name="warning" size={32} />
+            </div>
+            <h3 className={styles.autoAssignErrorTitle}>Évaluations incomplètes</h3>
+            <p className={styles.autoAssignErrorText}>
+              Vous n'avez pas encore évalué toutes les tâches de la famille.
+            </p>
+            <p className={styles.autoAssignErrorCount}>
+              <strong>{getUserEvaluationCount(currentUser || '')}</strong> / <strong>{familyTasks.length}</strong> tâches évaluées
+            </p>
+            <p className={styles.autoAssignErrorExplain}>
+              Pour que l'auto-attribution fonctionne de manière optimale, chaque membre doit évaluer 
+              la durée et la pénibilité de toutes les tâches selon son propre ressenti.
+            </p>
+            <div className={styles.autoAssignErrorActions}>
+              <button
+                className={styles.autoAssignErrorBtn}
+                onClick={() => {
+                  setShowAutoAssignError(false);
+                  setActiveTab("taches");
+                }}
+              >
+                <Icon name="sliders" size={16} />
+                Évaluer les tâches
+              </button>
+              <button
+                className={styles.autoAssignErrorCancel}
+                onClick={() => setShowAutoAssignError(false)}
+              >
+                Fermer
               </button>
             </div>
           </div>
