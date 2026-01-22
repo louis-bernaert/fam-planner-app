@@ -3623,6 +3623,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   <Icon name="arrowRight" size={12} />
                 </button>
               </div>
+              <button 
+                onClick={() => autoAssign()}
+                className={styles.autoAssignBtn}
+                title="Attribuer automatiquement les tâches non assignées"
+              >
+                <Icon name="sparkles" size={14} />
+                Auto-attribution
+              </button>
             </div>
 
             <div className={styles.plannerGrid}>
