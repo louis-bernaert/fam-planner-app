@@ -1022,6 +1022,170 @@
   margin-bottom: var(--space-4);
 }
 
+.evalBanner {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: linear-gradient(135deg, var(--color-primary-subtle), var(--color-bg-subtle));
+  border: 1px solid var(--color-primary);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-4);
+}
+
+.evalBanner span:first-child {
+  font-size: 1.25rem;
+}
+
+.evalBanner span:last-child {
+  font-size: 0.875rem;
+  color: var(--color-text);
+}
+
+.evalBannerSuccess {
+  background: linear-gradient(135deg, var(--color-success), #34d399);
+  border-color: var(--color-success);
+}
+
+.evalBannerSuccess span:last-child {
+  color: white;
+}
+
+.modalOverlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.evaluationModal {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  width: 100%;
+  max-width: 480px;
+  box-shadow: 0 20px 25px -5px rgba(0, 0, 0, 0.1), 0 10px 10px -5px rgba(0, 0, 0, 0.04);
+}
+
+.evaluationModalTitle {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 var(--space-2) 0;
+}
+
+.evaluationModalSubtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-4) 0;
+}
+
+.evaluationModalExplain {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  margin: 0 0 var(--space-5) 0;
+  line-height: 1.5;
+}
+
+.evaluationModalInputs {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  margin-bottom: var(--space-5);
+}
+
+.evaluationModalField {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.evaluationModalField label {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-text);
+}
+
+.evaluationModalField input {
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 1rem;
+  background-color: var(--color-bg-subtle);
+  color: var(--color-text);
+}
+
+.evaluationModalField input:focus {
+  outline: none;
+  border-color: var(--color-primary);
+  box-shadow: 0 0 0 3px var(--color-primary-subtle);
+}
+
+.evaluationModalInfo {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background-color: var(--color-bg-subtle);
+  border-radius: var(--radius-md);
+  margin-bottom: var(--space-5);
+}
+
+.evaluationModalInfo span:first-child {
+  color: var(--color-primary);
+}
+
+.evaluationModalInfo span:last-child {
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  line-height: 1.4;
+}
+
+.evaluationModalActions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+.evaluationModalCancel {
+  padding: var(--space-3) var(--space-5);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.evaluationModalCancel:hover {
+  background-color: var(--color-bg-subtle);
+}
+
+.evaluationModalSave {
+  padding: var(--space-3) var(--space-5);
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: var(--color-primary);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.evaluationModalSave:hover {
+  background-color: var(--color-primary-hover);
+}
+
 .taskListHeader h4 {
   font-size: 1rem;
   font-weight: 600;
@@ -1238,6 +1402,29 @@
 .editBtn:hover {
   background-color: var(--color-primary);
   color: var(--color-text-inverted);
+}
+
+.evalBtn {
+  background-color: var(--color-surface);
+  color: var(--color-text-muted);
+  border: 1px solid var(--color-border);
+}
+
+.evalBtn:hover {
+  background-color: var(--color-primary-subtle);
+  color: var(--color-primary);
+  border-color: var(--color-primary);
+}
+
+.evalBtn.evalBtnDone {
+  background-color: var(--color-success);
+  color: white;
+  border-color: var(--color-success);
+}
+
+.evalBtn.evalBtnDone:hover {
+  background-color: var(--color-success);
+  opacity: 0.9;
 }
 
 .deleteBtn {

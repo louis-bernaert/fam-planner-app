@@ -3206,6 +3206,19 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               </h4>
             </div>
 
+            {/* Evaluation Progress Banner - Desktop */}
+            {currentUser && familyTasks.length > 0 && (
+              <div className={`${styles.evalBanner} ${getUserEvaluationCount(currentUser) >= familyTasks.length ? styles.evalBannerSuccess : ''}`}>
+                <Icon name={getUserEvaluationCount(currentUser) >= familyTasks.length ? "check" : "sliders"} size={16} />
+                <span>
+                  {getUserEvaluationCount(currentUser) >= familyTasks.length 
+                    ? "Vous avez évalué toutes les tâches ✓ — Les points sont calculés sur la médiane des évaluations."
+                    : `Évaluations personnelles: ${getUserEvaluationCount(currentUser)}/${familyTasks.length} tâches — Évaluez les tâches pour améliorer l'auto-attribution.`
+                  }
+                </span>
+              </div>
+            )}
+
             <div className={styles.listBox}>
               {familyTasks.map((task) => {
                 const userId = computedAssignments.get(task.id);
@@ -3315,6 +3328,21 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           </>
                         ) : (
                           <>
+                            <button
+                              className={`${styles.evalBtn} ${getMyEvaluation(task.id) ? styles.evalBtnDone : ''}`}
+                              onClick={() => {
+                                const myEval = getMyEvaluation(task.id);
+                                setPendingEvaluation({
+                                  duration: myEval?.duration ?? task.duration,
+                                  penibility: myEval?.penibility ?? task.penibility
+                                });
+                                setShowEvaluationModal(task.id);
+                              }}
+                              aria-label={getMyEvaluation(task.id) ? "Modifier mon évaluation" : "Évaluer cette tâche"}
+                              title={getMyEvaluation(task.id) ? "Modifier mon évaluation" : "Évaluer cette tâche"}
+                            >
+                              <Icon name={getMyEvaluation(task.id) ? "check" : "sliders"} size={14} />
+                            </button>
                             <button
                               className={styles.editBtn}
                               onClick={() => startEditTask(task)}
@@ -5555,6 +5583,75 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       </nav>
 
       {tabContent}
+
+      {/* Desktop Evaluation Modal */}
+      {showEvaluationModal && (
+        <div className={styles.modalOverlay} onClick={() => setShowEvaluationModal(null)}>
+          <div className={styles.evaluationModal} onClick={(e) => e.stopPropagation()}>
+            <h3 className={styles.evaluationModalTitle}>
+              <Icon name="sliders" size={20} />
+              Mon évaluation personnelle
+            </h3>
+            <p className={styles.evaluationModalSubtitle}>
+              {tasks.find(t => t.id === showEvaluationModal)?.title}
+            </p>
+            <p className={styles.evaluationModalExplain}>
+              Indiquez <strong>votre ressenti</strong> sur la durée et la pénibilité de cette tâche. 
+              Ces données servent à calculer les points (médiane) et à l'auto-attribution intelligente.
+            </p>
+            
+            <div className={styles.evaluationModalInputs}>
+              <div className={styles.evaluationModalField}>
+                <label>Durée estimée (minutes)</label>
+                <input
+                  type="number"
+                  value={pendingEvaluation.duration}
+                  onChange={(e) => setPendingEvaluation(prev => ({ ...prev, duration: parseInt(e.target.value) || 0 }))}
+                  min={5}
+                  max={240}
+                />
+              </div>
+              <div className={styles.evaluationModalField}>
+                <label>Pénibilité ressentie (%)</label>
+                <input
+                  type="number"
+                  value={pendingEvaluation.penibility}
+                  onChange={(e) => setPendingEvaluation(prev => ({ ...prev, penibility: parseInt(e.target.value) || 0 }))}
+                  min={1}
+                  max={100}
+                />
+              </div>
+            </div>
+
+            <div className={styles.evaluationModalInfo}>
+              <Icon name="info" size={14} />
+              <span>
+                Les points collectifs sont calculés sur la <strong>médiane</strong> de toutes les évaluations.
+                L'auto-attribution utilise vos préférences relatives pour équilibrer les tâches.
+              </span>
+            </div>
+
+            <div className={styles.evaluationModalActions}>
+              <button
+                className={styles.evaluationModalSave}
+                onClick={() => {
+                  saveEvaluation(showEvaluationModal, pendingEvaluation.duration, pendingEvaluation.penibility);
+                  setShowEvaluationModal(null);
+                }}
+              >
+                <Icon name="check" size={16} />
+                Enregistrer
+              </button>
+              <button
+                className={styles.evaluationModalCancel}
+                onClick={() => setShowEvaluationModal(null)}
+              >
+                Annuler
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
