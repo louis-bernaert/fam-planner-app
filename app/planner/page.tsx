@@ -2581,29 +2581,19 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
     
     // ===== ALGORITHME D'AUTO-ATTRIBUTION INTELLIGENT =====
-    // Attribue les tâches pour les 7 prochains jours
+    // Attribue les tâches pour les 7 prochains jours de façon équitable
     
     const normalizedCosts = calculateNormalizedCosts();
-    const newAssignments: { taskId: string; userId: string; date: string; key: string }[] = [];
+    const newAssignments: { taskId: string; userId: string; date: string; key: string; points: number }[] = [];
     
     // Charge actuelle par utilisateur (en points) pour la semaine
     const weeklyLoad = new Map<string, number>();
     familyUsers.forEach((u) => weeklyLoad.set(u.id, 0));
 
-    // Calculer le total des points pour la semaine pour équilibrer
+    // Calculer le total des points pour la semaine (toutes les tâches non assignées)
     let totalWeeklyPoints = 0;
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
-      const date = new Date();
-      date.setDate(date.getDate() + dayOffset);
-      const tasksForDay = getTasksForDay(date);
-      tasksForDay.forEach(task => {
-        totalWeeklyPoints += calculateTaskPoints(task);
-      });
-    }
-    const targetPerUser = totalWeeklyPoints / familyUsers.length;
-    const lambda = 2.0;
-
-    // Pour chaque jour des 7 prochains jours
+    const allUnassignedTasks: { task: Task; date: Date; dateStr: string; key: string; timeSlot: string }[] = [];
+    
     for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
       const date = new Date();
       date.setDate(date.getDate() + dayOffset);
@@ -2614,62 +2604,91 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
       
-      // Récupérer les tâches pour ce jour
       const tasksForDay = getTasksForDay(date);
       
-      // Filtrer les tâches non encore assignées ce jour
-      const unassignedTasks = tasksForDay.filter(task => {
+      tasksForDay.forEach(task => {
         const key = `${task.id}_${dateStr}`;
         const existing = taskAssignments[key];
-        return !existing || existing.userIds.length === 0;
-      });
-
-      // Trier les tâches par points décroissants
-      const sortedTasks = [...unassignedTasks].sort((a, b) => calculateTaskPoints(b) - calculateTaskPoints(a));
-
-      sortedTasks.forEach((task) => {
-        const timeSlot = getTaskTimeSlot(task, date);
+        const isUnassigned = !existing || existing.userIds.length === 0;
         
-        // Candidats éligibles (non occupés sur ce créneau ce jour)
-        const candidates = familyUsers.filter((u) => {
-          // Vérifier indisponibilités récurrentes
-          if (u.unavailable.includes(timeSlot)) return false;
-          // Vérifier calendrier (événements)
-          if (isUserBusyAtTime(u.id, date, timeSlot)) return false;
-          return true;
-        });
-        
-        if (!candidates.length) return;
-
-        const taskPoints = calculateTaskPoints(task);
-        
-        const scored = candidates.map(user => {
-          const costEntry = normalizedCosts.find(c => c.userId === user.id && c.taskId === task.id);
-          const personalCost = costEntry?.cost ?? 0.5;
-          
-          const userLoad = weeklyLoad.get(user.id) ?? 0;
-          const overTarget = Math.max(0, (userLoad + taskPoints) - targetPerUser);
-          const overloadPenalty = targetPerUser > 0 ? overTarget / targetPerUser : 0;
-          
-          const decisionScore = personalCost + lambda * overloadPenalty;
-          
-          return { user, personalCost, decisionScore };
-        });
-
-        scored.sort((a, b) => a.decisionScore - b.decisionScore);
-        const picked = scored[0].user;
-        
-        weeklyLoad.set(picked.id, (weeklyLoad.get(picked.id) ?? 0) + taskPoints);
-        
-        const key = `${task.id}_${dateStr}`;
-        newAssignments.push({ taskId: task.id, userId: picked.id, date: dateStr, key });
+        if (isUnassigned) {
+          totalWeeklyPoints += calculateTaskPoints(task);
+          allUnassignedTasks.push({
+            task,
+            date,
+            dateStr,
+            key,
+            timeSlot: getTaskTimeSlot(task, date)
+          });
+        }
       });
     }
 
-    if (newAssignments.length === 0) {
-      setToastMessage({ type: 'error', text: 'Aucune tâche à attribuer (toutes déjà assignées ou indisponibilités)' });
+    if (allUnassignedTasks.length === 0) {
+      setToastMessage({ type: 'error', text: 'Toutes les tâches sont déjà assignées !' });
       return;
     }
+
+    // Quota équitable par personne = total des points / nombre de membres
+    const targetPerUser = totalWeeklyPoints / familyUsers.length;
+    const lambda = 3.0; // Pénalité forte pour forcer l'équilibre
+    
+    // Trier les tâches par points décroissants (grosses tâches d'abord pour meilleur équilibrage)
+    allUnassignedTasks.sort((a, b) => calculateTaskPoints(b.task) - calculateTaskPoints(a.task));
+
+    allUnassignedTasks.forEach(({ task, date, dateStr, key, timeSlot }) => {
+      // Candidats éligibles (non occupés sur ce créneau ce jour)
+      const candidates = familyUsers.filter((u) => {
+        // Vérifier indisponibilités récurrentes
+        if (u.unavailable.includes(timeSlot)) return false;
+        // Vérifier calendrier (événements)
+        if (isUserBusyAtTime(u.id, date, timeSlot)) return false;
+        return true;
+      });
+      
+      if (!candidates.length) return;
+
+      const taskPoints = calculateTaskPoints(task);
+      
+      const scored = candidates.map(user => {
+        const costEntry = normalizedCosts.find(c => c.userId === user.id && c.taskId === task.id);
+        const personalCost = costEntry?.cost ?? 0.5;
+        
+        const userLoad = weeklyLoad.get(user.id) ?? 0;
+        
+        // Pénalité de surcharge : plus on dépasse la cible, plus c'est pénalisé
+        const projectedLoad = userLoad + taskPoints;
+        const overTarget = Math.max(0, projectedLoad - targetPerUser);
+        const overloadPenalty = targetPerUser > 0 ? (overTarget / targetPerUser) ** 2 : 0; // Quadratique pour forcer l'équilibre
+        
+        // Bonus pour ceux qui sont en dessous de leur quota
+        const underTarget = Math.max(0, targetPerUser - userLoad);
+        const underloadBonus = targetPerUser > 0 ? underTarget / targetPerUser * 0.3 : 0;
+        
+        const decisionScore = personalCost + lambda * overloadPenalty - underloadBonus;
+        
+        return { user, personalCost, decisionScore, currentLoad: userLoad };
+      });
+
+      scored.sort((a, b) => a.decisionScore - b.decisionScore);
+      const picked = scored[0].user;
+      
+      weeklyLoad.set(picked.id, (weeklyLoad.get(picked.id) ?? 0) + taskPoints);
+      
+      newAssignments.push({ taskId: task.id, userId: picked.id, date: dateStr, key, points: taskPoints });
+    });
+
+    if (newAssignments.length === 0) {
+      setToastMessage({ type: 'error', text: 'Aucune tâche attribuable (vérifiez les disponibilités)' });
+      return;
+    }
+
+    // Calculer la répartition finale pour le message
+    const finalDistribution = new Map<string, number>();
+    familyUsers.forEach(u => finalDistribution.set(u.id, 0));
+    newAssignments.forEach(a => {
+      finalDistribution.set(a.userId, (finalDistribution.get(a.userId) ?? 0) + a.points);
+    });
 
     // Sauvegarder les attributions
     const saveAssignments = async () => {
@@ -2686,7 +2705,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             userIds: [assignment.userId] 
           };
           
-          // Sauvegarde en base
+          // Sauvegarde en base via l'API task-registrations
           const response = await fetch('/api/task-registrations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2705,11 +2724,19 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           }
         }
         
-        // Mettre à jour l'état local
+        // Mettre à jour l'état local pour affichage immédiat
         setTaskAssignments(prev => ({ ...prev, ...localUpdates }));
         
+        // Message avec répartition des points
+        const distributionText = familyUsers
+          .map(u => `${u.name}: ${Math.round(finalDistribution.get(u.id) ?? 0)} pts`)
+          .join(' | ');
+        
         if (errorCount === 0) {
-          setToastMessage({ type: 'success', text: `${successCount} tâche(s) attribuée(s) pour la semaine !` });
+          setToastMessage({ 
+            type: 'success', 
+            text: `${successCount} tâches attribuées ! Quota: ~${Math.round(targetPerUser)} pts/pers` 
+          });
         } else {
           setToastMessage({ type: 'error', text: `${successCount} réussie(s), ${errorCount} échec(s)` });
         }
