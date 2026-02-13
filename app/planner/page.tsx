@@ -2557,6 +2557,34 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     updateUserInDB();
   }
 
+  // [1] Historique de rotation : combien de fois chaque user a fait chaque tâche sur 28 jours
+  const getRotationHistory = (): Map<string, Map<string, number>> => {
+    const history = new Map<string, Map<string, number>>();
+    const now = new Date();
+    now.setHours(0, 0, 0, 0);
+    const cutoff = new Date(now);
+    cutoff.setDate(cutoff.getDate() - 28);
+
+    for (const [key, assignment] of Object.entries(taskAssignments)) {
+      const underscoreIndex = key.lastIndexOf('_');
+      if (underscoreIndex === -1) continue;
+      const dateStr = key.substring(underscoreIndex + 1);
+      const taskId = key.substring(0, underscoreIndex);
+
+      const [year, month, day] = dateStr.split('-').map(Number);
+      const assignDate = new Date(year, month - 1, day);
+      if (assignDate < cutoff || assignDate > now) continue;
+
+      for (const userId of assignment.userIds) {
+        if (!history.has(userId)) history.set(userId, new Map());
+        const userMap = history.get(userId)!;
+        userMap.set(taskId, (userMap.get(taskId) ?? 0) + 1);
+      }
+    }
+
+    return history;
+  };
+
   function autoAssign() {
     // ===== VÉRIFICATION DES PRÉREQUIS =====
     if (!currentUser) {
@@ -2630,9 +2658,29 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
 
     // Quota équitable par personne = total des points / nombre de membres
-    const targetPerUser = totalWeeklyPoints / familyUsers.length;
     const lambda = 3.0; // Pénalité forte pour forcer l'équilibre
-    
+    const gamma = 0.15; // Pénalité de rotation historique
+    const epsilon = 0.05; // Seuil de tie-break stochastique
+
+    // [3] Cible dynamique par utilisateur (pondérée par présence)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const presenceWeights = new Map<string, number>();
+    let totalWeight = 0;
+    familyUsers.forEach(u => {
+      const absenceDays = getUserAbsenceDaysForWeek(u.id, today);
+      const weight = Math.max(0.1, (7 - absenceDays) / 7); // minimum 0.1 pour éviter division par 0
+      presenceWeights.set(u.id, weight);
+      totalWeight += weight;
+    });
+    const getTargetForUser = (userId: string): number => {
+      const weight = presenceWeights.get(userId) || 1;
+      return totalWeeklyPoints * (weight / totalWeight);
+    };
+
+    // [1] Historique de rotation (4 dernières semaines)
+    const rotationHistory = getRotationHistory();
+
     // Trier les tâches par points décroissants (grosses tâches d'abord pour meilleur équilibrage)
     allUnassignedTasks.sort((a, b) => calculateTaskPoints(b.task) - calculateTaskPoints(a.task));
 
@@ -2645,36 +2693,41 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         if (isUserBusyAtTime(u.id, date, timeSlot)) return false;
         return true;
       });
-      
+
       if (!candidates.length) return;
 
       const taskPoints = calculateTaskPoints(task);
-      
+
       const scored = candidates.map(user => {
         const costEntry = normalizedCosts.find(c => c.userId === user.id && c.taskId === task.id);
         const personalCost = costEntry?.cost ?? 0.5;
-        
+
         const userLoad = weeklyLoad.get(user.id) ?? 0;
-        
-        // Pénalité de surcharge : plus on dépasse la cible, plus c'est pénalisé
+        const userTarget = getTargetForUser(user.id);
+
+        // [4] Pénalité progressive (ratio² dès le début, pas seulement après dépassement)
         const projectedLoad = userLoad + taskPoints;
-        const overTarget = Math.max(0, projectedLoad - targetPerUser);
-        const overloadPenalty = targetPerUser > 0 ? (overTarget / targetPerUser) ** 2 : 0; // Quadratique pour forcer l'équilibre
-        
-        // Bonus pour ceux qui sont en dessous de leur quota
-        const underTarget = Math.max(0, targetPerUser - userLoad);
-        const underloadBonus = targetPerUser > 0 ? underTarget / targetPerUser * 0.3 : 0;
-        
-        const decisionScore = personalCost + lambda * overloadPenalty - underloadBonus;
-        
+        const loadRatio = userTarget > 0 ? projectedLoad / userTarget : 0;
+        const progressivePenalty = loadRatio ** 2;
+
+        // [1] Pénalité de rotation historique
+        const rotationCount = rotationHistory.get(user.id)?.get(task.id) ?? 0;
+        const rotationPenalty = gamma * rotationCount;
+
+        const decisionScore = personalCost + lambda * progressivePenalty + rotationPenalty;
+
         return { user, personalCost, decisionScore, currentLoad: userLoad };
       });
 
+      // [2] Tie-break stochastique : si scores proches, tirage aléatoire
       scored.sort((a, b) => a.decisionScore - b.decisionScore);
-      const picked = scored[0].user;
-      
+      const topCandidates = scored.filter(s => s.decisionScore - scored[0].decisionScore < epsilon);
+      const picked = topCandidates.length > 1
+        ? topCandidates[Math.floor(Math.random() * topCandidates.length)].user
+        : scored[0].user;
+
       weeklyLoad.set(picked.id, (weeklyLoad.get(picked.id) ?? 0) + taskPoints);
-      
+
       newAssignments.push({ taskId: task.id, userId: picked.id, date: dateStr, key, points: taskPoints });
     });
 
@@ -2735,7 +2788,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         if (errorCount === 0) {
           setToastMessage({ 
             type: 'success', 
-            text: `${successCount} tâches attribuées ! Quota: ~${Math.round(targetPerUser)} pts/pers` 
+            text: `${successCount} tâches attribuées ! Total: ${Math.round(totalWeeklyPoints)} pts répartis`
           });
         } else {
           setToastMessage({ type: 'error', text: `${successCount} réussie(s), ${errorCount} échec(s)` });
@@ -2753,13 +2806,32 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const previewAutoAssign = () => {
     const normalizedCosts = calculateNormalizedCosts();
     const preview: { task: Task; userId: string; userName: string; cost: number; reason: string }[] = [];
-    
+
     const currentLoad = new Map<string, number>();
     familyUsers.forEach((u) => currentLoad.set(u.id, 0));
 
     const totalPoints = familyTasks.reduce((sum, t) => sum + calculateTaskPoints(t), 0);
-    const targetPerUser = totalPoints / familyUsers.length;
-    const lambda = 2.0;
+    const lambda = 3.0;
+    const gamma = 0.15;
+
+    // [3] Cible dynamique par utilisateur (pondérée par présence)
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const presenceWeights = new Map<string, number>();
+    let totalWeight = 0;
+    familyUsers.forEach(u => {
+      const absenceDays = getUserAbsenceDaysForWeek(u.id, today);
+      const weight = Math.max(0.1, (7 - absenceDays) / 7);
+      presenceWeights.set(u.id, weight);
+      totalWeight += weight;
+    });
+    const getTargetForUser = (userId: string): number => {
+      const weight = presenceWeights.get(userId) || 1;
+      return totalPoints * (weight / totalWeight);
+    };
+
+    // [1] Historique de rotation
+    const rotationHistory = getRotationHistory();
 
     const sortedTasks = [...familyTasks].sort((a, b) => calculateTaskPoints(b) - calculateTaskPoints(a));
 
@@ -2769,34 +2841,45 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       if (!candidates.length) return;
 
       const taskPoints = calculateTaskPoints(task);
-      
+
       const scored = candidates.map(user => {
         const costEntry = normalizedCosts.find(c => c.userId === user.id && c.taskId === task.id);
         const personalCost = costEntry?.cost ?? 0.5;
         const userLoad = currentLoad.get(user.id) ?? 0;
-        const overTarget = Math.max(0, (userLoad + taskPoints) - targetPerUser);
-        const overloadPenalty = overTarget / targetPerUser;
-        const decisionScore = personalCost + lambda * overloadPenalty;
-        
-        return { user, personalCost, decisionScore, overloadPenalty };
+        const userTarget = getTargetForUser(user.id);
+
+        // [4] Pénalité progressive
+        const projectedLoad = userLoad + taskPoints;
+        const loadRatio = userTarget > 0 ? projectedLoad / userTarget : 0;
+        const progressivePenalty = loadRatio ** 2;
+
+        // [1] Pénalité de rotation
+        const rotationCount = rotationHistory.get(user.id)?.get(task.id) ?? 0;
+        const rotationPenalty = gamma * rotationCount;
+
+        const decisionScore = personalCost + lambda * progressivePenalty + rotationPenalty;
+
+        return { user, personalCost, decisionScore, progressivePenalty, rotationCount };
       });
 
       scored.sort((a, b) => a.decisionScore - b.decisionScore);
       const winner = scored[0];
-      
+
       currentLoad.set(winner.user.id, (currentLoad.get(winner.user.id) ?? 0) + taskPoints);
-      
+
       let reason = '';
       if (winner.personalCost < 0.3) {
         reason = 'Trouve cette tâche facile';
-      } else if (winner.overloadPenalty === 0) {
+      } else if (winner.progressivePenalty < 0.1) {
         reason = 'A de la capacité';
+      } else if (winner.rotationCount === 0 && scored.some(s => s.rotationCount > 0)) {
+        reason = 'Rotation (alternance)';
       } else if (winner.personalCost < scored[scored.length - 1]?.personalCost - 0.2) {
         reason = 'Préfère cette tâche';
       } else {
         reason = 'Équilibrage de charge';
       }
-      
+
       preview.push({
         task,
         userId: winner.user.id,
