@@ -31,6 +31,14 @@ export default function FamilySettingsPage() {
   const [newUserEmail, setNewUserEmail] = useState("");
   const [addUserMessage, setAddUserMessage] = useState("");
 
+  // Kick member
+  const [memberToKick, setMemberToKick] = useState<{
+    userId: string;
+    name: string;
+    familyId: string;
+    familyName: string;
+  } | null>(null);
+
   useEffect(() => {
     const stored = localStorage.getItem("sessionUser");
     if (stored) {
@@ -244,6 +252,49 @@ export default function FamilySettingsPage() {
     }
   };
 
+  const kickMember = async () => {
+    if (!memberToKick) return;
+    try {
+      const res = await fetch(`/api/families/${memberToKick.familyId}/kick`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          userId: memberToKick.userId,
+          requesterId: selectedUser,
+        }),
+      });
+      if (res.ok) {
+        setUsers((prev) =>
+          prev.filter(
+            (u) =>
+              !(u.id === memberToKick.userId && u.familyId === memberToKick.familyId)
+          )
+        );
+        // Also update the family members in families state
+        setFamilies((prev) =>
+          prev.map((f) =>
+            f.id === memberToKick.familyId
+              ? {
+                  ...f,
+                  members: f.members.filter(
+                    (m: any) => m.userId !== memberToKick.userId
+                  ),
+                }
+              : f
+          )
+        );
+        setMemberToKick(null);
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || "Erreur lors de l'exclusion");
+        setMemberToKick(null);
+      }
+    } catch (err) {
+      console.error("Failed to kick member", err);
+      setMemberToKick(null);
+    }
+  };
+
   return (
     <div className={styles.pageContainer}>
       <div className={styles.pageHeader}>
@@ -307,6 +358,9 @@ export default function FamilySettingsPage() {
         <div className={styles.listBox}>
           {families.map((f) => {
             const familyMembers = users.filter((u) => u.familyId === f.id);
+            const isCurrentUserAdmin = f.members?.some(
+              (m: any) => m.userId === selectedUser && m.role === "admin"
+            );
             return (
               <div key={f.id}>
                 <div className={styles.listRow}>
@@ -330,18 +384,18 @@ export default function FamilySettingsPage() {
                         <p className={styles.mutedSmall}>Code: {f.code}</p>
                       </div>
                       <div className={styles.rowActions}>
-                        <button 
-                          className={`${styles.smallButton} ${styles.iconOnly}`} 
-                          onClick={() => startEditFamily(f.id)} 
-                          aria-label="Modifier" 
+                        <button
+                          className={`${styles.smallButton} ${styles.iconOnly}`}
+                          onClick={() => startEditFamily(f.id)}
+                          aria-label="Modifier"
                           title="Modifier"
                         >
                           <Icon name="pen" size={12} />
                         </button>
-                        <button 
-                          className={`${styles.smallGhost} ${styles.iconOnly}`} 
-                          onClick={() => deleteFamily(f.id)} 
-                          aria-label="Supprimer" 
+                        <button
+                          className={`${styles.smallGhost} ${styles.iconOnly}`}
+                          onClick={() => deleteFamily(f.id)}
+                          aria-label="Supprimer"
                           title="Supprimer"
                         >
                           <Icon name="trash" size={12} />
@@ -355,12 +409,39 @@ export default function FamilySettingsPage() {
                     {familyMembers.length === 0 ? (
                       <p className={styles.mutedSmall}>Aucun membre</p>
                     ) : (
-                      familyMembers.map((member) => (
-                        <div key={member.id} className={styles.memberChip}>
-                          {makeFullName(member.firstName, member.lastName, member.name)}
-                          {member.isAdmin && <span className={styles.adminBadge}>(admin)</span>}
-                        </div>
-                      ))
+                      familyMembers.map((member) => {
+                        const memberRole = f.members?.find(
+                          (m: any) => m.userId === member.id
+                        )?.role;
+                        const isMemberAdmin = memberRole === "admin";
+                        const canKick =
+                          isCurrentUserAdmin &&
+                          !isMemberAdmin &&
+                          member.id !== selectedUser;
+                        return (
+                          <div key={member.id} className={styles.memberChip}>
+                            {makeFullName(member.firstName, member.lastName, member.name)}
+                            {isMemberAdmin && <span className={styles.adminBadge}>(admin)</span>}
+                            {canKick && (
+                              <button
+                                className={styles.kickButton}
+                                onClick={() =>
+                                  setMemberToKick({
+                                    userId: member.id,
+                                    name: makeFullName(member.firstName, member.lastName, member.name),
+                                    familyId: f.id,
+                                    familyName: f.name,
+                                  })
+                                }
+                                aria-label="Exclure"
+                                title="Exclure de la famille"
+                              >
+                                <Icon name="xmark" size={10} />
+                              </button>
+                            )}
+                          </div>
+                        );
+                      })
                     )}
                   </div>
                 ) : null}
@@ -397,6 +478,34 @@ export default function FamilySettingsPage() {
         </div>
         {addUserMessage && <p className={styles.mutedSmall}>{addUserMessage}</p>}
       </div>
+
+      {/* Kick Member Confirmation Modal */}
+      {memberToKick && (
+        <div className={styles.modalOverlay} onClick={() => setMemberToKick(null)}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <h3>Exclure un membre</h3>
+              <button className={styles.modalClose} onClick={() => setMemberToKick(null)}>
+                <Icon name="xmark" size={16} />
+              </button>
+            </div>
+            <div className={styles.modalBody}>
+              <p>
+                Voulez-vous vraiment exclure <strong>{memberToKick.name}</strong> de la
+                famille <strong>{memberToKick.familyName}</strong> ?
+              </p>
+            </div>
+            <div className={styles.modalFooter}>
+              <button className={styles.btnSecondary} onClick={() => setMemberToKick(null)}>
+                Annuler
+              </button>
+              <button className={styles.btnDanger} onClick={kickMember}>
+                Exclure
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

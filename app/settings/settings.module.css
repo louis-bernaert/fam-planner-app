@@ -433,6 +433,27 @@
   margin-left: var(--space-1);
 }
 
+.kickButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  margin-left: var(--space-1);
+  background: none;
+  border: none;
+  border-radius: var(--radius-full);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+}
+
+.kickButton:hover {
+  background-color: var(--color-error-subtle, rgba(239, 68, 68, 0.1));
+  color: var(--color-error, #ef4444);
+}
+
 .formGridSmall {
   display: grid;
   grid-template-columns: auto 1fr;
