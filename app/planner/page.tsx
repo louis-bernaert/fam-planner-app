@@ -264,7 +264,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const [showEvaluationModal, setShowEvaluationModal] = useState<string | null>(null); // taskId or null
   const [pendingEvaluation, setPendingEvaluation] = useState<{ duration: number; penibility: number }>({ duration: 30, penibility: 30 });
   const [showAutoAssignError, setShowAutoAssignError] = useState(false);
-  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string; details?: string[] } | null>(null);
+  const [toastDetailsOpen, setToastDetailsOpen] = useState(false);
   const [mobileCalendarView, setMobileCalendarView] = useState<'month' | 'week' | 'day'>('month');
   const [mobileShowTaskForm, setMobileShowTaskForm] = useState(false);
   const [mobileShowExceptionalForm, setMobileShowExceptionalForm] = useState(false);
@@ -307,10 +308,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
   }, [weeklyHistory]);
 
-  // Auto-dismiss toast after 4 seconds
+  // Auto-dismiss toast after delay (longer if has details)
   useEffect(() => {
     if (toastMessage) {
-      const timer = setTimeout(() => setToastMessage(null), 4000);
+      setToastDetailsOpen(false);
+      const delay = toastMessage.details ? 8000 : 4000;
+      const timer = setTimeout(() => setToastMessage(null), delay);
       return () => clearTimeout(timer);
     }
   }, [toastMessage]);
@@ -1831,6 +1834,29 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     return map;
   }, [assignments]);
 
+  // Vérifie si toutes les tâches des 7 prochains jours sont déjà assignées
+  const isAllWeekAssigned = useMemo(() => {
+    if (familyTasks.length === 0) return false;
+    let hasAnyTask = false;
+    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+      const date = new Date();
+      date.setDate(date.getDate() + dayOffset);
+      date.setHours(0, 0, 0, 0);
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+      const tasksForDay = getTasksForDay(date);
+      for (const task of tasksForDay) {
+        hasAnyTask = true;
+        const key = `${task.id}_${dateStr}`;
+        const existing = taskAssignments[key];
+        if (!existing || existing.userIds.length === 0) return false;
+      }
+    }
+    return hasAnyTask;
+  }, [familyTasks, taskAssignments]);
+
   function addFamily() {
     setParamMessage("");
     if (!newFamilyName.trim()) {
@@ -2593,12 +2619,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
     
     if (familyUsers.length === 0) {
-      setToastMessage({ type: 'error', text: 'Aucun membre dans la famille' });
+      setToastMessage({ type: 'error', text: 'Aucun membre dans la famille. Ajoutez des membres dans les réglages.' });
       return;
     }
     
     if (familyTasks.length === 0) {
-      setToastMessage({ type: 'error', text: 'Aucune tâche à attribuer' });
+      setToastMessage({ type: 'error', text: 'Aucune tâche configurée. Créez des tâches dans l\'onglet Tâches.' });
       return;
     }
     
@@ -2653,7 +2679,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
 
     if (allUnassignedTasks.length === 0) {
-      setToastMessage({ type: 'error', text: 'Toutes les tâches sont déjà assignées !' });
+      setToastMessage({ type: 'error', text: 'Toutes les tâches des 7 prochains jours sont déjà attribuées.' });
       return;
     }
 
@@ -2732,7 +2758,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     });
 
     if (newAssignments.length === 0) {
-      setToastMessage({ type: 'error', text: 'Aucune tâche attribuable (vérifiez les disponibilités)' });
+      setToastMessage({ type: 'error', text: 'Impossible d\'attribuer : tous les membres sont indisponibles sur les créneaux restants.' });
       return;
     }
 
@@ -2780,22 +2806,26 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         // Mettre à jour l'état local pour affichage immédiat
         setTaskAssignments(prev => ({ ...prev, ...localUpdates }));
         
-        // Message avec répartition des points
-        const distributionText = familyUsers
-          .map(u => `${u.name}: ${Math.round(finalDistribution.get(u.id) ?? 0)} pts`)
-          .join(' | ');
-        
+        // Message avec répartition des points par participant
+        const details = familyUsers
+          .map(u => {
+            const pts = Math.round(finalDistribution.get(u.id) ?? 0);
+            return `${u.name} : ${pts} pts`;
+          })
+          .filter(line => !line.endsWith(': 0 pts'));
+
         if (errorCount === 0) {
-          setToastMessage({ 
-            type: 'success', 
-            text: `${successCount} tâches attribuées ! Total: ${Math.round(totalWeeklyPoints)} pts répartis`
+          setToastMessage({
+            type: 'success',
+            text: `${successCount} tâches attribuées ! (${Math.round(totalWeeklyPoints)} pts répartis)`,
+            details
           });
         } else {
-          setToastMessage({ type: 'error', text: `${successCount} réussie(s), ${errorCount} échec(s)` });
+          setToastMessage({ type: 'error', text: `${successCount} tâche(s) attribuée(s), mais ${errorCount} ont échoué (erreur serveur).` });
         }
       } catch (error) {
         console.error("Failed to save assignments", error);
-        setToastMessage({ type: 'error', text: 'Erreur lors de la sauvegarde des attributions' });
+        setToastMessage({ type: 'error', text: 'Erreur réseau lors de la sauvegarde. Vérifiez votre connexion et réessayez.' });
       }
     };
 
@@ -3843,10 +3873,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   <Icon name="arrowRight" size={12} />
                 </button>
               </div>
-              <button 
+              <button
                 onClick={() => autoAssign()}
-                className={styles.autoAssignBtn}
-                title="Attribuer automatiquement les tâches non assignées"
+                className={`${styles.autoAssignBtn} ${isAllWeekAssigned ? styles.autoAssignBtnDone : ''}`}
+                title={isAllWeekAssigned ? "Toutes les tâches sont déjà attribuées" : "Attribuer automatiquement les tâches non assignées"}
               >
                 <Icon name="sparkles" size={14} />
                 Auto-attribution
@@ -4893,9 +4923,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   </div>
 
                   {/* Bouton Auto-attribution mobile */}
-                  <button 
+                  <button
                     onClick={() => autoAssign()}
-                    className={styles.mobileAutoAssignBtn}
+                    className={`${styles.mobileAutoAssignBtn} ${isAllWeekAssigned ? styles.mobileAutoAssignBtnDone : ''}`}
                   >
                     <Icon name="sparkles" size={16} />
                     Auto-attribution
@@ -5932,18 +5962,33 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
       {/* Toast notification */}
       {toastMessage && (
-        <div 
-          className={`${styles.toast} ${toastMessage.type === 'success' ? styles.toastSuccess : styles.toastError}`}
-          onClick={() => setToastMessage(null)}
-        >
-          <Icon name={toastMessage.type === 'success' ? 'check' : 'warning'} size={18} />
-          <span>{toastMessage.text}</span>
-          <button 
-            className={styles.toastClose}
-            onClick={(e) => { e.stopPropagation(); setToastMessage(null); }}
-          >
-            <Icon name="xmark" size={14} />
-          </button>
+        <div className={`${styles.toast} ${toastMessage.type === 'success' ? styles.toastSuccess : styles.toastError}`}>
+          <div className={styles.toastMain}>
+            <Icon name={toastMessage.type === 'success' ? 'check' : 'warning'} size={18} />
+            <span>{toastMessage.text}</span>
+            {toastMessage.details && toastMessage.details.length > 0 && (
+              <button
+                className={`${styles.toastDetailsToggle} ${toastDetailsOpen ? styles.toastDetailsToggleOpen : ''}`}
+                onClick={(e) => { e.stopPropagation(); setToastDetailsOpen(v => !v); }}
+                aria-label="Voir les détails"
+              >
+                <Icon name="chevronDown" size={14} />
+              </button>
+            )}
+            <button
+              className={styles.toastClose}
+              onClick={(e) => { e.stopPropagation(); setToastMessage(null); }}
+            >
+              <Icon name="xmark" size={14} />
+            </button>
+          </div>
+          {toastDetailsOpen && toastMessage.details && (
+            <div className={styles.toastDetails}>
+              {toastMessage.details.map((detail, i) => (
+                <div key={i} className={styles.toastDetailItem}>{detail}</div>
+              ))}
+            </div>
+          )}
         </div>
       )}
     </main>
