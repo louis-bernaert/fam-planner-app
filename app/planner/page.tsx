@@ -266,6 +266,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const [showAutoAssignError, setShowAutoAssignError] = useState(false);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string; details?: string[] } | null>(null);
   const [toastDetailsOpen, setToastDetailsOpen] = useState(false);
+  const [adminAssignMenu, setAdminAssignMenu] = useState<{ taskId: string; date: Date; key: string } | null>(null);
   const [mobileCalendarView, setMobileCalendarView] = useState<'month' | 'week' | 'day'>('month');
   const [mobileShowTaskForm, setMobileShowTaskForm] = useState(false);
   const [mobileShowExceptionalForm, setMobileShowExceptionalForm] = useState(false);
@@ -673,6 +674,54 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     } catch (error) {
       console.error('Failed to delete registration', error);
     }
+  };
+
+  // Admin: assigner un membre spécifique à une tâche
+  const assignForUser = async (taskId: string, date: Date, userId: string) => {
+    const key = getTaskAssignmentKey(taskId, date);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    setTaskAssignments(prev => ({
+      ...prev,
+      [key]: { date: dateStr, userIds: [userId] }
+    }));
+
+    try {
+      await fetch('/api/task-registrations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ taskId, userId, date: dateStr }),
+      });
+    } catch (error) {
+      console.error('Failed to assign user', error);
+    }
+    setAdminAssignMenu(null);
+  };
+
+  // Admin: désinscrire n'importe quel membre d'une tâche
+  const unassignForUser = async (taskId: string, date: Date) => {
+    const key = getTaskAssignmentKey(taskId, date);
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    setTaskAssignments(prev => ({
+      ...prev,
+      [key]: { date: dateStr, userIds: [] }
+    }));
+
+    try {
+      await fetch(`/api/task-registrations?taskId=${taskId}&date=${dateStr}`, {
+        method: 'DELETE',
+      });
+    } catch (error) {
+      console.error('Failed to unassign user', error);
+    }
+    setAdminAssignMenu(null);
   };
 
   const calculateTaskPoints = (task: Task) => {
@@ -3930,6 +3979,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             const iAmBusy = currentUser ? isUserBusyAtTime(currentUser, day, timeSlot) : false;
                             const pointsBreakdown = getPointsBreakdown(task);
                             const assignedNames = assignedUserIds.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
+                            const taskKey = getTaskAssignmentKey(task.id, day);
 
                             return (
                               <div 
@@ -3984,6 +4034,43 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                       <Icon name="warning" size={12} />
                                       Indisponible
                                     </span>
+                                  )}
+                                  {currentUserRecord?.isAdmin && (
+                                    <div className={styles.adminAssignWrapper}>
+                                      <button
+                                        className={styles.adminAssignBtn}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setAdminAssignMenu(prev =>
+                                            prev?.key === taskKey ? null : { taskId: task.id, date: day, key: taskKey }
+                                          );
+                                        }}
+                                        title="Gérer l'inscription"
+                                      >
+                                        <Icon name="users" size={12} />
+                                      </button>
+                                      {adminAssignMenu?.key === taskKey && (
+                                        <div className={styles.adminAssignDropdown}>
+                                          <div className={styles.adminAssignHeader}>Inscrire un membre</div>
+                                          {familyUsers.filter(u => u.familyId === selectedFamily).map(member => {
+                                            const isMemberAssigned = assignedUserIds.includes(member.id);
+                                            return (
+                                              <button
+                                                key={member.id}
+                                                className={`${styles.adminAssignOption} ${isMemberAssigned ? styles.adminAssignOptionActive : ''}`}
+                                                onClick={() => isMemberAssigned
+                                                  ? unassignForUser(task.id, day)
+                                                  : assignForUser(task.id, day, member.id)
+                                                }
+                                              >
+                                                <span>{member.name}</span>
+                                                {isMemberAssigned && <Icon name="check" size={12} />}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
                                   )}
                                 </div>
                               </div>
@@ -5015,6 +5102,46 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                     Pris par {assignedNames}
                                   </span>
                                 )}
+                                {currentUserRecord?.isAdmin && (() => {
+                                  const mobileTaskKey = getTaskAssignmentKey(item.task.id, currentDay);
+                                  return (
+                                    <div className={styles.adminAssignWrapper}>
+                                      <button
+                                        className={styles.adminAssignBtn}
+                                        onClick={(e) => {
+                                          e.stopPropagation();
+                                          setAdminAssignMenu(prev =>
+                                            prev?.key === mobileTaskKey ? null : { taskId: item.task.id, date: currentDay, key: mobileTaskKey }
+                                          );
+                                        }}
+                                        title="Gérer l'inscription"
+                                      >
+                                        <Icon name="users" size={14} />
+                                      </button>
+                                      {adminAssignMenu?.key === mobileTaskKey && (
+                                        <div className={styles.adminAssignDropdown}>
+                                          <div className={styles.adminAssignHeader}>Inscrire un membre</div>
+                                          {familyUsers.filter(u => u.familyId === selectedFamily).map(member => {
+                                            const isMemberAssigned = assignedUserIds.includes(member.id);
+                                            return (
+                                              <button
+                                                key={member.id}
+                                                className={`${styles.adminAssignOption} ${isMemberAssigned ? styles.adminAssignOptionActive : ''}`}
+                                                onClick={() => isMemberAssigned
+                                                  ? unassignForUser(item.task.id, currentDay)
+                                                  : assignForUser(item.task.id, currentDay, member.id)
+                                                }
+                                              >
+                                                <span>{member.name}</span>
+                                                {isMemberAssigned && <Icon name="check" size={12} />}
+                                              </button>
+                                            );
+                                          })}
+                                        </div>
+                                      )}
+                                    </div>
+                                  );
+                                })()}
                               </div>
                             </div>
                           );
@@ -5918,6 +6045,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             </div>
           </div>
         </div>
+      )}
+
+      {/* Overlay pour fermer le menu admin */}
+      {adminAssignMenu && (
+        <div
+          className={styles.adminAssignOverlay}
+          onClick={() => setAdminAssignMenu(null)}
+        />
       )}
 
       {/* Modal d'erreur auto-attribution */}
