@@ -264,6 +264,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const [showEvaluationModal, setShowEvaluationModal] = useState<string | null>(null); // taskId or null
   const [pendingEvaluation, setPendingEvaluation] = useState<{ duration: number; penibility: number }>({ duration: 30, penibility: 30 });
   const [showAutoAssignError, setShowAutoAssignError] = useState(false);
+  const [missingEvaluationUsers, setMissingEvaluationUsers] = useState<{ name: string; evaluated: number; total: number }[]>([]);
   const [toastMessage, setToastMessage] = useState<{ type: 'success' | 'error'; text: string; details?: string[] } | null>(null);
   const [toastDetailsOpen, setToastDetailsOpen] = useState(false);
   const [adminAssignMenu, setAdminAssignMenu] = useState<{ taskId: string; date: Date; key: string } | null>(null);
@@ -1903,11 +1904,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     return map;
   }, [assignments]);
 
-  // Vérifie si toutes les tâches des 7 prochains jours sont déjà assignées
+  // Vérifie si toutes les tâches jusqu'à dimanche sont déjà assignées
   const isAllWeekAssigned = useMemo(() => {
     if (familyTasks.length === 0) return false;
     let hasAnyTask = false;
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+    // Plage lundi-dimanche
+    const todayDow = new Date().getDay(); // 0=Dim, 1=Lun... 6=Sam
+    const startOffset = todayDow === 0 ? 1 : 0;
+    const endOffset = todayDow === 0 ? 7 : (7 - todayDow);
+    for (let dayOffset = startOffset; dayOffset <= endOffset; dayOffset++) {
       const date = new Date();
       date.setDate(date.getDate() + dayOffset);
       date.setHours(0, 0, 0, 0);
@@ -2697,18 +2702,25 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       return;
     }
     
-    const userEvalCount = getUserEvaluationCount(currentUser);
-    if (userEvalCount < familyTasks.length) {
+    // Vérifier que TOUS les membres ont évalué toutes les tâches
+    const evaluationStatus = familyUsers.map(user => ({
+      name: user.name,
+      evaluated: taskEvaluations.filter(e => e.userId === user.id).length,
+      total: familyTasks.length,
+    }));
+    const incomplete = evaluationStatus.filter(s => s.evaluated < s.total);
+    if (incomplete.length > 0) {
+      setMissingEvaluationUsers(incomplete);
       setShowAutoAssignError(true);
       return;
     }
     
     // ===== ALGORITHME D'AUTO-ATTRIBUTION INTELLIGENT =====
-    // Attribue les tâches pour les 7 prochains jours de façon équitable
-    
+    // Attribue les tâches jusqu'à dimanche (semaine lundi-dimanche)
+
     const normalizedCosts = calculateNormalizedCosts();
     const newAssignments: { taskId: string; userId: string; date: string; key: string; points: number }[] = [];
-    
+
     // Charge actuelle par utilisateur (en points) pour la semaine
     const weeklyLoad = new Map<string, number>();
     familyUsers.forEach((u) => weeklyLoad.set(u.id, 0));
@@ -2716,8 +2728,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     // Calculer le total des points pour la semaine (toutes les tâches non assignées)
     let totalWeeklyPoints = 0;
     const allUnassignedTasks: { task: Task; date: Date; dateStr: string; key: string; timeSlot: string }[] = [];
-    
-    for (let dayOffset = 0; dayOffset < 7; dayOffset++) {
+
+    // Plage lundi-dimanche : si dimanche, commence demain (lundi) jusqu'au dimanche suivant
+    const todayDow = new Date().getDay(); // 0=Dim, 1=Lun... 6=Sam
+    const startOffset = todayDow === 0 ? 1 : 0;
+    const endOffset = todayDow === 0 ? 7 : (7 - todayDow);
+
+    for (let dayOffset = startOffset; dayOffset <= endOffset; dayOffset++) {
       const date = new Date();
       date.setDate(date.getDate() + dayOffset);
       date.setHours(0, 0, 0, 0);
@@ -2748,7 +2765,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
 
     if (allUnassignedTasks.length === 0) {
-      setToastMessage({ type: 'error', text: 'Toutes les tâches des 7 prochains jours sont déjà attribuées.' });
+      setToastMessage({ type: 'error', text: 'Toutes les tâches sont déjà attribuées jusqu\'à dimanche.' });
       return;
     }
 
@@ -6076,14 +6093,22 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             </div>
             <h3 className={styles.autoAssignErrorTitle}>Évaluations incomplètes</h3>
             <p className={styles.autoAssignErrorText}>
-              Vous n'avez pas encore évalué toutes les tâches de la famille.
+              Tous les membres doivent évaluer toutes les tâches avant l'auto-attribution.
             </p>
-            <p className={styles.autoAssignErrorCount}>
-              <strong>{getUserEvaluationCount(currentUser || '')}</strong> / <strong>{familyTasks.length}</strong> tâches évaluées
-            </p>
+            {missingEvaluationUsers.length > 0 && (
+              <div style={{ width: '100%', margin: '12px 0' }}>
+                {missingEvaluationUsers.map((u, i) => (
+                  <div key={i} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '6px 0', borderBottom: '1px solid var(--border-color, #e5e7eb)' }}>
+                    <span style={{ fontWeight: 500 }}>{u.name}</span>
+                    <span style={{ color: u.evaluated < u.total ? 'var(--danger-color, #ef4444)' : 'var(--success-color, #22c55e)', fontWeight: 600 }}>
+                      {u.evaluated} / {u.total}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
             <p className={styles.autoAssignErrorExplain}>
-              Pour que l'auto-attribution fonctionne de manière optimale, chaque membre doit évaluer 
-              la durée et la pénibilité de toutes les tâches selon son propre ressenti.
+              Chaque membre doit évaluer la durée et la pénibilité de toutes les tâches selon son propre ressenti.
             </p>
             <div className={styles.autoAssignErrorActions}>
               <button
