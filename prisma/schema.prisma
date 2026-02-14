@@ -84,7 +84,7 @@ model TaskRegistration {
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())
 
-  @@unique([taskId, date]) // Une seule personne peut s'inscrire par tâche/date
+  @@unique([taskId, userId, date]) // Unicité par tâche/user/date
 }
 
 // Validation d'une tâche effectuée

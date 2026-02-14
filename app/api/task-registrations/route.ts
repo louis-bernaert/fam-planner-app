@@ -46,14 +46,12 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Upsert: créer ou mettre à jour l'inscription
+    // Upsert: créer l'inscription si elle n'existe pas déjà
     const registration = await prisma.taskRegistration.upsert({
       where: {
-        taskId_date: { taskId, date },
+        taskId_userId_date: { taskId, userId, date },
       },
-      update: {
-        userId,
-      },
+      update: {},
       create: {
         taskId,
         userId,
@@ -81,17 +79,18 @@ export async function DELETE(req: NextRequest) {
   try {
     const taskId = req.nextUrl.searchParams.get("taskId");
     const date = req.nextUrl.searchParams.get("date");
+    const userId = req.nextUrl.searchParams.get("userId");
 
-    if (!taskId || !date) {
+    if (!taskId || !date || !userId) {
       return NextResponse.json(
-        { error: "taskId and date are required" },
+        { error: "taskId, date, and userId are required" },
         { status: 400 }
       );
     }
 
     await prisma.taskRegistration.delete({
       where: {
-        taskId_date: { taskId, date },
+        taskId_userId_date: { taskId, userId, date },
       },
     });
 

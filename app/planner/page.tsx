@@ -668,7 +668,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     
     // Delete from database
     try {
-      await fetch(`/api/task-registrations?taskId=${taskId}&date=${dateStr}`, {
+      await fetch(`/api/task-registrations?taskId=${taskId}&date=${dateStr}&userId=${currentUser}`, {
         method: 'DELETE',
       });
     } catch (error) {
@@ -684,10 +684,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
 
-    setTaskAssignments(prev => ({
-      ...prev,
-      [key]: { date: dateStr, userIds: [userId] }
-    }));
+    setTaskAssignments(prev => {
+      const existing = prev[key];
+      const existingUserIds = existing?.userIds || [];
+      if (existingUserIds.includes(userId)) return prev;
+      return {
+        ...prev,
+        [key]: { date: dateStr, userIds: [...existingUserIds, userId] }
+      };
+    });
 
     try {
       await fetch('/api/task-registrations', {
@@ -698,30 +703,32 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     } catch (error) {
       console.error('Failed to assign user', error);
     }
-    setAdminAssignMenu(null);
   };
 
-  // Admin: désinscrire n'importe quel membre d'une tâche
-  const unassignForUser = async (taskId: string, date: Date) => {
+  // Admin: désinscrire un membre spécifique d'une tâche
+  const unassignForUser = async (taskId: string, date: Date, userId: string) => {
     const key = getTaskAssignmentKey(taskId, date);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
 
-    setTaskAssignments(prev => ({
-      ...prev,
-      [key]: { date: dateStr, userIds: [] }
-    }));
+    setTaskAssignments(prev => {
+      const existing = prev[key];
+      const existingUserIds = existing?.userIds || [];
+      return {
+        ...prev,
+        [key]: { date: dateStr, userIds: existingUserIds.filter(id => id !== userId) }
+      };
+    });
 
     try {
-      await fetch(`/api/task-registrations?taskId=${taskId}&date=${dateStr}`, {
+      await fetch(`/api/task-registrations?taskId=${taskId}&date=${dateStr}&userId=${userId}`, {
         method: 'DELETE',
       });
     } catch (error) {
       console.error('Failed to unassign user', error);
     }
-    setAdminAssignMenu(null);
   };
 
   const calculateTaskPoints = (task: Task) => {
@@ -4059,7 +4066,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                                 key={member.id}
                                                 className={`${styles.adminAssignOption} ${isMemberAssigned ? styles.adminAssignOptionActive : ''}`}
                                                 onClick={() => isMemberAssigned
-                                                  ? unassignForUser(task.id, day)
+                                                  ? unassignForUser(task.id, day, member.id)
                                                   : assignForUser(task.id, day, member.id)
                                                 }
                                               >
@@ -5128,7 +5135,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                                 key={member.id}
                                                 className={`${styles.adminAssignOption} ${isMemberAssigned ? styles.adminAssignOptionActive : ''}`}
                                                 onClick={() => isMemberAssigned
-                                                  ? unassignForUser(item.task.id, currentDay)
+                                                  ? unassignForUser(item.task.id, currentDay, member.id)
                                                   : assignForUser(item.task.id, currentDay, member.id)
                                                 }
                                               >
