@@ -44,6 +44,7 @@ model Membership {
   color       String  @default("#3b82f6")
   calendarUrl String?
   participatesInLeaderboard Boolean @default(true)
+  participatesInAutoAssign  Boolean @default(true)
 
   user   User   @relation(fields: [userId], references: [id])
   family Family @relation(fields: [familyId], references: [id])

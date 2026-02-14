@@ -21,6 +21,7 @@ type User = {
   familyId?: string;
   isAdmin?: boolean;
   participatesInLeaderboard?: boolean;
+  participatesInAutoAssign?: boolean;
 };
 
 type Family = {
@@ -1699,6 +1700,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     familyId: family.id,
                     isAdmin: membership.role === 'admin',
                     participatesInLeaderboard: membership.participatesInLeaderboard !== false,
+                    participatesInAutoAssign: membership.participatesInAutoAssign !== false,
                   };
                   if (existingIdx < 0) {
                     allMembers.push(memberUser);
@@ -2696,14 +2698,21 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       setToastMessage({ type: 'error', text: 'Aucun membre dans la famille. Ajoutez des membres dans les réglages.' });
       return;
     }
+
+    // Filtrer les membres qui participent à l'auto-attribution
+    const autoAssignUsers = familyUsers.filter(u => u.participatesInAutoAssign !== false);
+    if (autoAssignUsers.length === 0) {
+      setToastMessage({ type: 'error', text: 'Aucun membre ne participe à l\'auto-attribution. Modifiez les réglages des points.' });
+      return;
+    }
     
     if (familyTasks.length === 0) {
       setToastMessage({ type: 'error', text: 'Aucune tâche configurée. Créez des tâches dans l\'onglet Tâches.' });
       return;
     }
     
-    // Vérifier que TOUS les membres ont évalué toutes les tâches
-    const evaluationStatus = familyUsers.map(user => ({
+    // Vérifier que TOUS les membres participants ont évalué toutes les tâches
+    const evaluationStatus = autoAssignUsers.map(user => ({
       name: user.name,
       evaluated: taskEvaluations.filter(e => e.userId === user.id).length,
       total: familyTasks.length,
@@ -2723,7 +2732,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
     // Charge actuelle par utilisateur (en points) pour la semaine
     const weeklyLoad = new Map<string, number>();
-    familyUsers.forEach((u) => weeklyLoad.set(u.id, 0));
+    autoAssignUsers.forEach((u) => weeklyLoad.set(u.id, 0));
 
     // Calculer le total des points pour la semaine (toutes les tâches non assignées)
     let totalWeeklyPoints = 0;
@@ -2779,7 +2788,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     today.setHours(0, 0, 0, 0);
     const presenceWeights = new Map<string, number>();
     let totalWeight = 0;
-    familyUsers.forEach(u => {
+    autoAssignUsers.forEach(u => {
       const absenceDays = getUserAbsenceDaysForWeek(u.id, today);
       const weight = Math.max(0.1, (7 - absenceDays) / 7); // minimum 0.1 pour éviter division par 0
       presenceWeights.set(u.id, weight);
@@ -2798,7 +2807,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
     allUnassignedTasks.forEach(({ task, date, dateStr, key, timeSlot }) => {
       // Candidats éligibles (non occupés sur ce créneau ce jour)
-      const candidates = familyUsers.filter((u) => {
+      const candidates = autoAssignUsers.filter((u) => {
         // Vérifier indisponibilités récurrentes
         if (u.unavailable.includes(timeSlot)) return false;
         // Vérifier calendrier (événements)
@@ -2850,7 +2859,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
     // Calculer la répartition finale pour le message
     const finalDistribution = new Map<string, number>();
-    familyUsers.forEach(u => finalDistribution.set(u.id, 0));
+    autoAssignUsers.forEach(u => finalDistribution.set(u.id, 0));
     newAssignments.forEach(a => {
       finalDistribution.set(a.userId, (finalDistribution.get(a.userId) ?? 0) + a.points);
     });

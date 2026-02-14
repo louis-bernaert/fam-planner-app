@@ -12,6 +12,7 @@ interface Family {
     id: string;
     userId: string;
     participatesInLeaderboard: boolean;
+    participatesInAutoAssign: boolean;
     user: {
       id: string;
       name: string;
@@ -100,6 +101,39 @@ export default function PointsSettingsPage() {
       }
     } catch (error) {
       console.error("Failed to update participation", error);
+      showToast("error", "Erreur lors de la mise à jour");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const toggleAutoAssignParticipation = async (membershipId: string, currentValue: boolean) => {
+    setSaving(true);
+    try {
+      const res = await fetch("/api/settings/points/participation", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          membershipId,
+          participatesInAutoAssign: !currentValue,
+        }),
+      });
+
+      if (res.ok) {
+        setFamilies(prev => prev.map(f => ({
+          ...f,
+          members: f.members.map(m =>
+            m.id === membershipId
+              ? { ...m, participatesInAutoAssign: !currentValue }
+              : m
+          )
+        })));
+        showToast("success", !currentValue ? "Participe à l'auto-attribution" : "Retiré de l'auto-attribution");
+      } else {
+        showToast("error", "Erreur lors de la mise à jour");
+      }
+    } catch (error) {
+      console.error("Failed to update auto-assign participation", error);
       showToast("error", "Erreur lors de la mise à jour");
     } finally {
       setSaving(false);
@@ -253,6 +287,36 @@ export default function PointsSettingsPage() {
                     type="checkbox"
                     checked={member.participatesInLeaderboard}
                     onChange={() => toggleParticipation(member.id, member.participatesInLeaderboard)}
+                    disabled={saving}
+                  />
+                  <span className={styles.toggleTrack} />
+                </label>
+              </div>
+            ))}
+          </div>
+        </section>
+
+        {/* Auto-assign participation section */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <div className={`${styles.sectionIconWrapper} ${styles.sectionIconPrimary}`}>
+              <Icon name="calendar" size={22} />
+            </div>
+            <div className={styles.sectionInfo}>
+              <h2>Auto-attribution</h2>
+              <p>Choisissez qui participe à l'auto-attribution des tâches</p>
+            </div>
+          </div>
+
+          <div className={styles.memberList}>
+            {currentFamily?.members.map(member => (
+              <div key={member.id} className={styles.memberItem}>
+                <span className={styles.memberName}>{member.user.name}</span>
+                <label className={styles.toggle}>
+                  <input
+                    type="checkbox"
+                    checked={member.participatesInAutoAssign}
+                    onChange={() => toggleAutoAssignParticipation(member.id, member.participatesInAutoAssign)}
                     disabled={saving}
                   />
                   <span className={styles.toggleTrack} />
