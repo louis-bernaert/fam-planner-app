@@ -5661,6 +5661,7 @@
 /* Admin assign dropdown */
 .adminAssignWrapper {
   position: relative;
+  z-index: 100;
 }
 
 .adminAssignBtn {
