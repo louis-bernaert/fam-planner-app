@@ -5661,7 +5661,6 @@
 /* Admin assign dropdown */
 .adminAssignWrapper {
   position: relative;
-  z-index: 100;
 }
 
 .adminAssignBtn {
@@ -5681,12 +5680,6 @@
 .adminAssignBtn:hover {
   background: rgba(99, 102, 241, 0.2);
   border-color: #6366f1;
-}
-
-.adminAssignOverlay {
-  position: fixed;
-  inset: 0;
-  z-index: 99;
 }
 
 .adminAssignDropdown {

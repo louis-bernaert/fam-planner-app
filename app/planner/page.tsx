@@ -272,6 +272,19 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const [mobileShowExceptionalForm, setMobileShowExceptionalForm] = useState(false);
   const [mobileDelegationModal, setMobileDelegationModal] = useState<{ taskId: string; date: Date } | null>(null);
 
+  // Fermer le menu admin quand on clique en dehors
+  useEffect(() => {
+    if (!adminAssignMenu) return;
+    const handleClickOutside = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (!target.closest(`.${styles.adminAssignWrapper}`)) {
+        setAdminAssignMenu(null);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [adminAssignMenu]);
+
   // Theme state
   const [theme, setTheme] = useState<Theme>(() => {
     if (typeof window !== 'undefined') {
@@ -6052,14 +6065,6 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             </div>
           </div>
         </div>
-      )}
-
-      {/* Overlay pour fermer le menu admin */}
-      {adminAssignMenu && (
-        <div
-          className={styles.adminAssignOverlay}
-          onClick={() => setAdminAssignMenu(null)}
-        />
       )}
 
       {/* Modal d'erreur auto-attribution */}
