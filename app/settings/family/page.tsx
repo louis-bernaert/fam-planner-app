@@ -252,6 +252,40 @@ export default function FamilySettingsPage() {
     }
   };
 
+  const toggleAdminRole = async (membershipId: string, currentRole: string, familyId: string) => {
+    const newRole = currentRole === "admin" ? "member" : "admin";
+    try {
+      const res = await fetch("/api/memberships", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          membershipId,
+          role: newRole,
+          requesterId: selectedUser,
+        }),
+      });
+      if (res.ok) {
+        setFamilies((prev) =>
+          prev.map((f) =>
+            f.id === familyId
+              ? {
+                  ...f,
+                  members: f.members.map((m: any) =>
+                    m.id === membershipId ? { ...m, role: newRole } : m
+                  ),
+                }
+              : f
+          )
+        );
+      } else {
+        const errorData = await res.json();
+        alert(errorData.error || "Erreur lors de la modification du rôle");
+      }
+    } catch (err) {
+      console.error("Failed to update role", err);
+    }
+  };
+
   const kickMember = async () => {
     if (!memberToKick) return;
     try {
@@ -410,18 +444,35 @@ export default function FamilySettingsPage() {
                       <p className={styles.mutedSmall}>Aucun membre</p>
                     ) : (
                       familyMembers.map((member) => {
-                        const memberRole = f.members?.find(
+                        const membership = f.members?.find(
                           (m: any) => m.userId === member.id
-                        )?.role;
+                        );
+                        const memberRole = membership?.role;
+                        const membershipId = membership?.id;
                         const isMemberAdmin = memberRole === "admin";
                         const canKick =
                           isCurrentUserAdmin &&
                           !isMemberAdmin &&
                           member.id !== selectedUser;
+                        const canToggleAdmin =
+                          isCurrentUserAdmin &&
+                          member.id !== selectedUser &&
+                          membershipId;
                         return (
                           <div key={member.id} className={styles.memberChip}>
                             {makeFullName(member.firstName, member.lastName, member.name)}
                             {isMemberAdmin && <span className={styles.adminBadge}>(admin)</span>}
+                            {canToggleAdmin && (
+                              <button
+                                className={styles.kickButton}
+                                onClick={() => toggleAdminRole(membershipId, memberRole || "member", f.id)}
+                                aria-label={isMemberAdmin ? "Révoquer admin" : "Nommer admin"}
+                                title={isMemberAdmin ? "Révoquer admin" : "Nommer admin"}
+                                style={isMemberAdmin ? { color: 'var(--color-primary, #3b82f6)' } : undefined}
+                              >
+                                <Icon name="star" size={10} />
+                              </button>
+                            )}
                             {canKick && (
                               <button
                                 className={styles.kickButton}

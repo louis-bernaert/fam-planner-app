@@ -56,6 +56,67 @@ export async function GET(req: NextRequest) {
   }
 }
 
+export async function PUT(req: NextRequest) {
+  try {
+    const { membershipId, role, requesterId } = await req.json();
+
+    if (!membershipId || !role || !requesterId) {
+      return NextResponse.json(
+        { error: "membershipId, role, and requesterId are required" },
+        { status: 400 }
+      );
+    }
+
+    if (!["admin", "member"].includes(role)) {
+      return NextResponse.json(
+        { error: "Role must be 'admin' or 'member'" },
+        { status: 400 }
+      );
+    }
+
+    // Verify requester is admin of the same family
+    const targetMembership = await prisma.membership.findUnique({
+      where: { id: membershipId },
+    });
+
+    if (!targetMembership) {
+      return NextResponse.json(
+        { error: "Membership not found" },
+        { status: 404 }
+      );
+    }
+
+    const requesterMembership = await prisma.membership.findFirst({
+      where: {
+        userId: requesterId,
+        familyId: targetMembership.familyId,
+        role: "admin",
+      },
+    });
+
+    if (!requesterMembership) {
+      return NextResponse.json(
+        { error: "Seuls les administrateurs peuvent modifier les rôles" },
+        { status: 403 }
+      );
+    }
+
+    const updated = await prisma.membership.update({
+      where: { id: membershipId },
+      data: { role },
+      include: { user: true },
+    });
+
+    return NextResponse.json(updated);
+  } catch (error) {
+    console.error("PUT /api/memberships", error);
+    return NextResponse.json(
+      { error: "Failed to update membership" },
+      { status: 500 }
+    );
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   try {
     const userId = req.nextUrl.searchParams.get("userId");
