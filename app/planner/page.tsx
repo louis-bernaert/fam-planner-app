@@ -3172,7 +3172,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             <span style={{ fontWeight: 500 }}>
                               {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
                             </span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{item.timeSlot}</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{formatTimeDisplay(item.timeSlot)}</span>
                           </div>
                           <div className={styles.myTaskInfo}>
                             <strong>{item.task.title}</strong>
@@ -3225,7 +3225,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             <span style={{ fontWeight: 500 }}>
                               {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
                             </span>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{item.timeSlot}</span>
+                            <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{formatTimeDisplay(item.timeSlot)}</span>
                           </div>
                           <div className={styles.myTaskInfo}>
                             <strong>{item.task.title}</strong>
@@ -3341,7 +3341,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               <span style={{ fontWeight: 500 }}>
                                 {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
                               </span>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{item.timeSlot}</span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{formatTimeDisplay(item.timeSlot)}</span>
                             </div>
                             <div className={styles.myTaskInfo}>
                               <strong>{item.task.title}</strong>
@@ -4939,7 +4939,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             <div className={styles.mobileTaskLeft}>
                               <span className={styles.mobileTaskTitle}>{item.task.title}</span>
                               <span className={styles.mobileTaskMeta}>
-                                {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })} · {item.timeSlot}
+                                {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })} · {formatTimeDisplay(item.timeSlot)}
                               </span>
                             </div>
                             <span className={styles.mobileTaskPoints}>+{item.points}</span>
@@ -5181,7 +5181,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 <div className={styles.mobileTaskLeft}>
                                   <span className={styles.mobileTaskTitle}>{item.task.title}</span>
                                   <span className={styles.mobileTaskMeta}>
-                                    {item.timeSlot} · {isAssigned ? assignedNames || 'Inconnu' : 'Libre'}
+                                    {formatTimeDisplay(item.timeSlot)} · {isAssigned ? assignedNames || 'Inconnu' : 'Libre'}
                                   </span>
                                 </div>
                                 <span className={styles.mobileTaskPoints}>+{displayPoints}{assignedUserIds.length > 1 && isMyTask ? ` (÷${assignedUserIds.length})` : ''}</span>
