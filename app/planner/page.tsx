@@ -6077,15 +6077,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           </div>
         </div>
         <div className={styles.topActions}>
-          <button 
-            className={styles.viewToggle}
-            onClick={() => setViewMode('mobile')}
-            title="Passer en mode Application"
-          >
-            <Icon name="mobileAlt" size={18} />
-            <span className={styles.viewLabel}>App</span>
-          </button>
-          <button 
+          <button
             className={styles.themeToggle} 
             onClick={() => {
               const newTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'auto' : 'light';
