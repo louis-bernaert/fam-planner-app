@@ -2779,8 +2779,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
 
     // Quota équitable par personne = total des points / nombre de membres
-    const lambda = 3.0; // Pénalité forte pour forcer l'équilibre
-    const gamma = 0.15; // Pénalité de rotation historique
+    const lambda = 2.5; // Multiplicateur de charge (modèle multiplicatif)
+    const gamma = 0.35; // Pénalité de rotation historique
     const epsilon = 0.05; // Seuil de tie-break stochastique
 
     // [3] Cible dynamique par utilisateur (pondérée par présence)
@@ -2823,21 +2823,27 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         const costEntry = normalizedCosts.find(c => c.userId === user.id && c.taskId === task.id);
         const personalCost = costEntry?.cost ?? 0.5;
 
+        // Bonus préférence forte : amplifier les vraies préférences (coût < 0.2)
+        const adjustedCost = personalCost < 0.2 ? personalCost * 0.7 : personalCost;
+
         const userLoad = weeklyLoad.get(user.id) ?? 0;
         const userTarget = getTargetForUser(user.id);
 
-        // [4] Pénalité progressive (ratio² dès le début, pas seulement après dépassement)
+        // Charge projetée et ratio
         const projectedLoad = userLoad + taskPoints;
         const loadRatio = userTarget > 0 ? projectedLoad / userTarget : 0;
-        const progressivePenalty = loadRatio ** 2;
 
-        // [1] Pénalité de rotation historique
+        // Modèle MULTIPLICATIF : la charge multiplie le coût, ne l'écrase pas
+        const chargeMultiplier = 1 + lambda * (loadRatio ** 2);
+
+        // Pénalité de rotation historique (4 dernières semaines)
         const rotationCount = rotationHistory.get(user.id)?.get(task.id) ?? 0;
         const rotationPenalty = gamma * rotationCount;
 
-        const decisionScore = personalCost + lambda * progressivePenalty + rotationPenalty;
+        // Score final = coût ajusté × multiplicateur de charge + rotation
+        const decisionScore = adjustedCost * chargeMultiplier + rotationPenalty;
 
-        return { user, personalCost, decisionScore, currentLoad: userLoad, userTarget, loadRatio, progressivePenalty, rotationCount, rotationPenalty };
+        return { user, personalCost, adjustedCost, decisionScore, currentLoad: userLoad, userTarget, loadRatio, chargeMultiplier, rotationCount, rotationPenalty };
       });
 
       // [2] Tie-break stochastique : si scores proches, tirage aléatoire
@@ -2851,10 +2857,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
       // Construire la raison détaillée
       const allScoresStr = scored.map(s =>
-        `${s.user.name}: score=${s.decisionScore.toFixed(2)} (coût=${s.personalCost.toFixed(2)}, charge=${Math.round(s.currentLoad)}/${Math.round(s.userTarget)} pts, ratio=${s.loadRatio.toFixed(2)}, rotation=${s.rotationCount}x)`
+        `${s.user.name}: score=${s.decisionScore.toFixed(2)} (coût=${s.personalCost.toFixed(2)}${s.adjustedCost !== s.personalCost ? '→' + s.adjustedCost.toFixed(2) : ''}, charge=${Math.round(s.currentLoad)}/${Math.round(s.userTarget)} pts, ratio=${s.loadRatio.toFixed(2)}, ×${s.chargeMultiplier.toFixed(2)}, rotation=${s.rotationCount}×${gamma})`
       ).join(' | ');
       const reason = topCandidates.length > 1
-        ? `Tie-break entre ${topCandidates.length} candidats proches → ${picked.user.name} choisi aléatoirement. [${allScoresStr}]`
+        ? `Tie-break entre ${topCandidates.length} candidats → ${picked.user.name} (aléatoire). [${allScoresStr}]`
         : `Meilleur score. [${allScoresStr}]`;
 
       newAssignments.push({ taskId: task.id, taskTitle: task.title, userId: picked.user.id, userName: picked.user.name, date: dateStr, key, points: taskPoints, reason });
