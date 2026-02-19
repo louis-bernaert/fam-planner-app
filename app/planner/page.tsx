@@ -2728,7 +2728,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     // Attribue les tâches jusqu'à dimanche (semaine lundi-dimanche)
 
     const normalizedCosts = calculateNormalizedCosts();
-    const newAssignments: { taskId: string; userId: string; date: string; key: string; points: number }[] = [];
+    const newAssignments: { taskId: string; taskTitle: string; userId: string; userName: string; date: string; key: string; points: number }[] = [];
 
     // Charge actuelle par utilisateur (en points) pour la semaine
     const weeklyLoad = new Map<string, number>();
@@ -2849,7 +2849,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
       weeklyLoad.set(picked.id, (weeklyLoad.get(picked.id) ?? 0) + taskPoints);
 
-      newAssignments.push({ taskId: task.id, userId: picked.id, date: dateStr, key, points: taskPoints });
+      newAssignments.push({ taskId: task.id, taskTitle: task.title, userId: picked.id, userName: picked.name, date: dateStr, key, points: taskPoints });
     });
 
     if (newAssignments.length === 0) {
@@ -2866,30 +2866,59 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
     // Sauvegarder les attributions
     const saveAssignments = async () => {
+      // Mise à jour locale IMMÉDIATE (avant les appels API)
+      setTaskAssignments(prev => {
+        const updated = { ...prev };
+        for (const assignment of newAssignments) {
+          const existing = updated[assignment.key];
+          const existingUserIds = existing?.userIds || [];
+          if (!existingUserIds.includes(assignment.userId)) {
+            updated[assignment.key] = {
+              date: assignment.date,
+              userIds: [...existingUserIds, assignment.userId],
+            };
+          }
+        }
+        return updated;
+      });
+
+      // Construire les détails du compte rendu
+      const userSummaries = new Map<string, { name: string; tasks: string[]; points: number }>();
+      autoAssignUsers.forEach(u => userSummaries.set(u.id, { name: u.name, tasks: [], points: 0 }));
+
+      for (const a of newAssignments) {
+        const summary = userSummaries.get(a.userId);
+        if (summary) {
+          const dayLabel = new Date(a.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+          summary.tasks.push(`${a.taskTitle} (${dayLabel})`);
+          summary.points += a.points;
+        }
+      }
+
+      const details: string[] = [];
+      userSummaries.forEach(summary => {
+        if (summary.tasks.length > 0) {
+          details.push(`${summary.name} — ${Math.round(summary.points)} pts :`);
+          summary.tasks.forEach(t => details.push(`  • ${t}`));
+        }
+      });
+
+      // Appels API en arrière-plan
       try {
         let successCount = 0;
         let errorCount = 0;
-        
-        // Mise à jour locale immédiate
-        const localUpdates: Record<string, { date: string; userIds: string[] }> = {};
-        
+
         for (const assignment of newAssignments) {
-          localUpdates[assignment.key] = { 
-            date: assignment.date, 
-            userIds: [assignment.userId] 
-          };
-          
-          // Sauvegarde en base via l'API task-registrations
           const response = await fetch('/api/task-registrations', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ 
-              taskId: assignment.taskId, 
-              userId: assignment.userId, 
-              date: assignment.date 
+            body: JSON.stringify({
+              taskId: assignment.taskId,
+              userId: assignment.userId,
+              date: assignment.date
             }),
           });
-          
+
           if (response.ok) {
             successCount++;
           } else {
@@ -2897,26 +2926,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             console.error('Registration failed:', assignment);
           }
         }
-        
-        // Mettre à jour l'état local pour affichage immédiat
-        setTaskAssignments(prev => ({ ...prev, ...localUpdates }));
-        
-        // Message avec répartition des points par participant
-        const details = familyUsers
-          .map(u => {
-            const pts = Math.round(finalDistribution.get(u.id) ?? 0);
-            return `${u.name} : ${pts} pts`;
-          })
-          .filter(line => !line.endsWith(': 0 pts'));
 
         if (errorCount === 0) {
           setToastMessage({
             type: 'success',
-            text: `${successCount} tâches attribuées ! (${Math.round(totalWeeklyPoints)} pts répartis)`,
+            text: `${successCount} tâches attribuées jusqu'à dimanche (${Math.round(totalWeeklyPoints)} pts répartis)`,
             details
           });
         } else {
-          setToastMessage({ type: 'error', text: `${successCount} tâche(s) attribuée(s), mais ${errorCount} ont échoué (erreur serveur).` });
+          setToastMessage({ type: 'error', text: `${successCount} tâche(s) attribuée(s), mais ${errorCount} ont échoué.` });
         }
       } catch (error) {
         console.error("Failed to save assignments", error);
