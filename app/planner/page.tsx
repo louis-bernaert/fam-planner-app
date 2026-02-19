@@ -6278,28 +6278,22 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               </button>
               <button
                 className={styles.autoAssignErrorBtn}
-                disabled={!suggestionText.trim()}
-                onClick={async () => {
-                  try {
-                    const res = await fetch("/api/suggestions", {
-                      method: "POST",
-                      headers: { "Content-Type": "application/json" },
-                      body: JSON.stringify({
-                        userId: currentUser,
-                        familyId: selectedFamily,
-                        content: suggestionText,
-                      }),
-                    });
-                    if (res.ok) {
-                      setSuggestionMessage("Merci pour votre suggestion !");
-                      setSuggestionText("");
-                      setTimeout(() => { setShowSuggestionModal(false); setSuggestionMessage(""); }, 1500);
-                    } else {
-                      setSuggestionMessage("Erreur lors de l'envoi.");
-                    }
-                  } catch {
-                    setSuggestionMessage("Erreur lors de l'envoi.");
-                  }
+                disabled={!suggestionText.trim() || suggestionMessage === "Merci pour votre suggestion !"}
+                onClick={() => {
+                  const content = suggestionText.trim();
+                  if (!content) return;
+                  setSuggestionMessage("Merci pour votre suggestion !");
+                  setSuggestionText("");
+                  setTimeout(() => { setShowSuggestionModal(false); setSuggestionMessage(""); }, 1500);
+                  fetch("/api/suggestions", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      userId: currentUser,
+                      familyId: selectedFamily,
+                      content,
+                    }),
+                  }).catch(() => {});
                 }}
               >
                 Envoyer
