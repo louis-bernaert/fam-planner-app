@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 import { Icon } from "../components/Icon";
+import { solveMILP } from "@/lib/autoAssignSolver";
+import type { SolverTaskDay, SolverCostEntry, SolverRotationEntry, SolverMember } from "@/lib/autoAssignSolver.types";
 
 type Theme = 'light' | 'dark' | 'auto';
 
@@ -2724,15 +2726,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       return;
     }
     
-    // ===== ALGORITHME D'AUTO-ATTRIBUTION INTELLIGENT =====
-    // Attribue les tâches jusqu'à dimanche (semaine lundi-dimanche)
+    // ===== SOLVEUR MILP D'AUTO-ATTRIBUTION =====
+    // Optimisation globale via programmation linéaire en nombres entiers
 
     const normalizedCosts = calculateNormalizedCosts();
-    const newAssignments: { taskId: string; taskTitle: string; userId: string; userName: string; date: string; key: string; points: number; reason: string }[] = [];
-
-    // Charge actuelle par utilisateur (en points) pour la semaine
-    const weeklyLoad = new Map<string, number>();
-    autoAssignUsers.forEach((u) => weeklyLoad.set(u.id, 0));
 
     // Calculer le total des points pour la semaine (toutes les tâches non assignées)
     let totalWeeklyPoints = 0;
@@ -2747,19 +2744,19 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       const date = new Date();
       date.setDate(date.getDate() + dayOffset);
       date.setHours(0, 0, 0, 0);
-      
+
       const year = date.getFullYear();
       const month = String(date.getMonth() + 1).padStart(2, '0');
       const day = String(date.getDate()).padStart(2, '0');
       const dateStr = `${year}-${month}-${day}`;
-      
+
       const tasksForDay = getTasksForDay(date);
-      
+
       tasksForDay.forEach(task => {
         const key = `${task.id}_${dateStr}`;
         const existing = taskAssignments[key];
         const isUnassigned = !existing || existing.userIds.length === 0;
-        
+
         if (isUnassigned) {
           totalWeeklyPoints += calculateTaskPoints(task);
           allUnassignedTasks.push({
@@ -2778,20 +2775,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       return;
     }
 
-    // Quota équitable par personne = total des points / nombre de membres
-    const lambda = 2.2; // Multiplicateur de charge (modèle multiplicatif)
-    const hardBrake = 2.0; // Pénalité linéaire après dépassement de cible
-    const gamma = 0.35; // Pénalité de rotation historique
-    const epsilon = 0.05; // Seuil de tie-break stochastique
-
-    // [3] Cible dynamique par utilisateur (pondérée par présence)
+    // Cible dynamique par utilisateur (pondérée par présence)
     const today = new Date();
     today.setHours(0, 0, 0, 0);
     const presenceWeights = new Map<string, number>();
     let totalWeight = 0;
     autoAssignUsers.forEach(u => {
       const absenceDays = getUserAbsenceDaysForWeek(u.id, today);
-      const weight = Math.max(0.1, (7 - absenceDays) / 7); // minimum 0.1 pour éviter division par 0
+      const weight = Math.max(0.1, (7 - absenceDays) / 7);
       presenceWeights.set(u.id, weight);
       totalWeight += weight;
     });
@@ -2800,78 +2791,82 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       return totalWeeklyPoints * (weight / totalWeight);
     };
 
-    // [1] Historique de rotation (4 dernières semaines)
+    // Historique de rotation (4 dernières semaines)
     const rotationHistory = getRotationHistory();
 
-    // Trier les tâches par points décroissants (grosses tâches d'abord pour meilleur équilibrage)
-    allUnassignedTasks.sort((a, b) => calculateTaskPoints(b.task) - calculateTaskPoints(a.task));
+    // Construire la matrice d'éligibilité (taskKey → userIds éligibles)
+    const eligibility = new Map<string, string[]>();
+    for (const { key, timeSlot, date } of allUnassignedTasks) {
+      const eligible = autoAssignUsers
+        .filter(u => {
+          if (u.unavailable.includes(timeSlot)) return false;
+          if (isUserBusyAtTime(u.id, date, timeSlot)) return false;
+          return true;
+        })
+        .map(u => u.id);
+      eligibility.set(key, eligible);
+    }
 
-    allUnassignedTasks.forEach(({ task, date, dateStr, key, timeSlot }) => {
-      // Candidats éligibles (non occupés sur ce créneau ce jour)
-      const candidates = autoAssignUsers.filter((u) => {
-        // Vérifier indisponibilités récurrentes
-        if (u.unavailable.includes(timeSlot)) return false;
-        // Vérifier calendrier (événements)
-        if (isUserBusyAtTime(u.id, date, timeSlot)) return false;
-        return true;
-      });
+    // Préparer les données pour le solveur
+    const solverTasks: SolverTaskDay[] = allUnassignedTasks.map(({ task, dateStr, key, timeSlot }) => ({
+      taskId: task.id,
+      taskTitle: task.title,
+      date: dateStr,
+      key,
+      points: calculateTaskPoints(task),
+      timeSlot,
+    }));
 
-      if (!candidates.length) return;
+    const solverMembers: SolverMember[] = autoAssignUsers.map(u => ({
+      userId: u.id,
+      userName: u.name,
+      target: getTargetForUser(u.id),
+      unavailableSlots: u.unavailable,
+    }));
 
-      const taskPoints = calculateTaskPoints(task);
+    const solverCosts: SolverCostEntry[] = normalizedCosts.map(c => ({
+      userId: c.userId,
+      taskId: c.taskId,
+      cost: c.cost,
+    }));
 
-      const scored = candidates.map(user => {
-        const costEntry = normalizedCosts.find(c => c.userId === user.id && c.taskId === task.id);
-        const personalCost = costEntry?.cost ?? 0.5;
+    const solverRotations: SolverRotationEntry[] = [];
+    for (const [userId, taskMap] of rotationHistory.entries()) {
+      for (const [taskId, count] of taskMap.entries()) {
+        solverRotations.push({ userId, taskId, count });
+      }
+    }
 
-        // Bonus préférence forte : amplifier les vraies préférences (coût < 0.2)
-        const adjustedCost = personalCost < 0.2 ? personalCost * 0.7 : personalCost;
+    // Historique de déséquilibre (semaine précédente)
+    const lastWeekBalances = autoAssignUsers.map(u => ({
+      userId: u.id,
+      balance: getLastWeekBalance(u.id),
+    }));
 
-        const userLoad = weeklyLoad.get(user.id) ?? 0;
-        const userTarget = getTargetForUser(user.id);
+    const solverResult = solveMILP(
+      {
+        tasks: solverTasks,
+        members: solverMembers,
+        costs: solverCosts,
+        rotations: solverRotations,
+        weeklyHistory: lastWeekBalances,
+        params: {
+          alpha: 4.0,
+          beta: 0.4,
+          lambdaHistory: 0.25,
+          preferenceBonus: 0.7,
+          preferenceThreshold: 0.2,
+        },
+      },
+      eligibility
+    );
 
-        // Charge projetée et ratio
-        const projectedLoad = userLoad + taskPoints;
-        const loadRatio = userTarget > 0 ? projectedLoad / userTarget : 0;
+    if (!solverResult.feasible) {
+      setToastMessage({ type: 'error', text: 'Le solveur n\'a pas trouvé de solution. Vérifiez les disponibilités des membres.' });
+      return;
+    }
 
-        // Modèle MULTIPLICATIF : la charge multiplie le coût, ne l'écrase pas
-        const chargeMultiplier = 1 + lambda * (loadRatio ** 2);
-        let baseScore = adjustedCost * chargeMultiplier;
-
-        // Hard brake : pénalité linéaire forte après dépassement de cible
-        if (loadRatio > 1) {
-          baseScore += hardBrake * (loadRatio - 1);
-        }
-
-        // Pénalité de rotation historique (4 dernières semaines)
-        const rotationCount = rotationHistory.get(user.id)?.get(task.id) ?? 0;
-        const rotationPenalty = gamma * rotationCount;
-
-        // Score final = baseScore + rotation
-        const decisionScore = baseScore + rotationPenalty;
-
-        return { user, personalCost, adjustedCost, decisionScore, currentLoad: userLoad, userTarget, loadRatio, chargeMultiplier, rotationCount, rotationPenalty, overTarget: loadRatio > 1 };
-      });
-
-      // [2] Tie-break stochastique : si scores proches, tirage aléatoire
-      scored.sort((a, b) => a.decisionScore - b.decisionScore);
-      const topCandidates = scored.filter(s => s.decisionScore - scored[0].decisionScore < epsilon);
-      const picked = topCandidates.length > 1
-        ? topCandidates[Math.floor(Math.random() * topCandidates.length)]
-        : scored[0];
-
-      weeklyLoad.set(picked.user.id, (weeklyLoad.get(picked.user.id) ?? 0) + taskPoints);
-
-      // Construire la raison détaillée
-      const allScoresStr = scored.map(s =>
-        `${s.user.name}: score=${s.decisionScore.toFixed(2)} (coût=${s.personalCost.toFixed(2)}${s.adjustedCost !== s.personalCost ? '→' + s.adjustedCost.toFixed(2) : ''}, charge=${Math.round(s.currentLoad)}/${Math.round(s.userTarget)} pts, ratio=${s.loadRatio.toFixed(2)}, ×${s.chargeMultiplier.toFixed(2)}${s.overTarget ? ', FREIN+' + (hardBrake * (s.loadRatio - 1)).toFixed(2) : ''}, rot=${s.rotationCount}×${gamma})`
-      ).join(' | ');
-      const reason = topCandidates.length > 1
-        ? `Tie-break entre ${topCandidates.length} candidats → ${picked.user.name} (aléatoire). [${allScoresStr}]`
-        : `Meilleur score. [${allScoresStr}]`;
-
-      newAssignments.push({ taskId: task.id, taskTitle: task.title, userId: picked.user.id, userName: picked.user.name, date: dateStr, key, points: taskPoints, reason });
-    });
+    const newAssignments = solverResult.assignments;
 
     if (newAssignments.length === 0) {
       setToastMessage({ type: 'error', text: 'Impossible d\'attribuer : tous les membres sont indisponibles sur les créneaux restants.' });

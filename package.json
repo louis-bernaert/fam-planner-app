@@ -15,6 +15,7 @@
     "@prisma/client": "^6.2.1",
     "bcryptjs": "^2.4.3",
     "ical.js": "^2.2.1",
+    "javascript-lp-solver": "^1.0.3",
     "next": "16.1.1",
     "react": "19.2.3",
     "react-dom": "19.2.3"
