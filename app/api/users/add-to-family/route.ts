@@ -20,15 +20,10 @@ export async function POST(req: NextRequest) {
     });
 
     if (!user) {
-      // Create new user if doesn't exist
-      user = await prisma.user.create({
-        data: {
-          email,
-          name: name || "",
-          passwordHash: "",
-        },
-        include: { memberships: true },
-      });
+      return NextResponse.json(
+        { error: "Aucun utilisateur trouvé avec cet email. Le membre doit d'abord créer un compte." },
+        { status: 404 }
+      );
     }
 
     // Check if already member of this family

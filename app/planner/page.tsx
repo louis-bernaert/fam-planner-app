@@ -2728,7 +2728,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     // Attribue les tâches jusqu'à dimanche (semaine lundi-dimanche)
 
     const normalizedCosts = calculateNormalizedCosts();
-    const newAssignments: { taskId: string; taskTitle: string; userId: string; userName: string; date: string; key: string; points: number }[] = [];
+    const newAssignments: { taskId: string; taskTitle: string; userId: string; userName: string; date: string; key: string; points: number; reason: string }[] = [];
 
     // Charge actuelle par utilisateur (en points) pour la semaine
     const weeklyLoad = new Map<string, number>();
@@ -2837,19 +2837,27 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
         const decisionScore = personalCost + lambda * progressivePenalty + rotationPenalty;
 
-        return { user, personalCost, decisionScore, currentLoad: userLoad };
+        return { user, personalCost, decisionScore, currentLoad: userLoad, userTarget, loadRatio, progressivePenalty, rotationCount, rotationPenalty };
       });
 
       // [2] Tie-break stochastique : si scores proches, tirage aléatoire
       scored.sort((a, b) => a.decisionScore - b.decisionScore);
       const topCandidates = scored.filter(s => s.decisionScore - scored[0].decisionScore < epsilon);
       const picked = topCandidates.length > 1
-        ? topCandidates[Math.floor(Math.random() * topCandidates.length)].user
-        : scored[0].user;
+        ? topCandidates[Math.floor(Math.random() * topCandidates.length)]
+        : scored[0];
 
-      weeklyLoad.set(picked.id, (weeklyLoad.get(picked.id) ?? 0) + taskPoints);
+      weeklyLoad.set(picked.user.id, (weeklyLoad.get(picked.user.id) ?? 0) + taskPoints);
 
-      newAssignments.push({ taskId: task.id, taskTitle: task.title, userId: picked.id, userName: picked.name, date: dateStr, key, points: taskPoints });
+      // Construire la raison détaillée
+      const allScoresStr = scored.map(s =>
+        `${s.user.name}: score=${s.decisionScore.toFixed(2)} (coût=${s.personalCost.toFixed(2)}, charge=${Math.round(s.currentLoad)}/${Math.round(s.userTarget)} pts, ratio=${s.loadRatio.toFixed(2)}, rotation=${s.rotationCount}x)`
+      ).join(' | ');
+      const reason = topCandidates.length > 1
+        ? `Tie-break entre ${topCandidates.length} candidats proches → ${picked.user.name} choisi aléatoirement. [${allScoresStr}]`
+        : `Meilleur score. [${allScoresStr}]`;
+
+      newAssignments.push({ taskId: task.id, taskTitle: task.title, userId: picked.user.id, userName: picked.user.name, date: dateStr, key, points: taskPoints, reason });
     });
 
     if (newAssignments.length === 0) {
@@ -2883,14 +2891,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       });
 
       // Construire les détails du compte rendu
-      const userSummaries = new Map<string, { name: string; tasks: string[]; points: number }>();
+      const userSummaries = new Map<string, { name: string; tasks: { title: string; day: string; points: number; reason: string }[]; points: number }>();
       autoAssignUsers.forEach(u => userSummaries.set(u.id, { name: u.name, tasks: [], points: 0 }));
 
       for (const a of newAssignments) {
         const summary = userSummaries.get(a.userId);
         if (summary) {
           const dayLabel = new Date(a.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
-          summary.tasks.push(`${a.taskTitle} (${dayLabel})`);
+          summary.tasks.push({ title: a.taskTitle, day: dayLabel, points: a.points, reason: a.reason });
           summary.points += a.points;
         }
       }
@@ -2898,8 +2906,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       const details: string[] = [];
       userSummaries.forEach(summary => {
         if (summary.tasks.length > 0) {
-          details.push(`${summary.name} — ${Math.round(summary.points)} pts :`);
-          summary.tasks.forEach(t => details.push(`  • ${t}`));
+          details.push(`── ${summary.name} — ${Math.round(summary.points)} pts ──`);
+          summary.tasks.forEach(t => {
+            details.push(`  • ${t.title} (${t.day}, ${Math.round(t.points)} pts)`);
+            details.push(`    ${t.reason}`);
+          });
         }
       });
 
