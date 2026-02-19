@@ -23,6 +23,7 @@ model User {
   registrations   TaskRegistration[]
   validations     TaskValidation[]
   evaluations     TaskEvaluation[]
+  suggestions     Suggestion[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
@@ -34,6 +35,7 @@ model Family {
   createdAt    DateTime       @default(now())
   members      Membership[]
   tasks        Task[]
+  suggestions  Suggestion[]
 }
 
 model Membership {
@@ -122,4 +124,14 @@ model TaskEvaluation {
   updatedAt   DateTime @updatedAt
 
   @@unique([taskId, userId]) // Une seule évaluation par utilisateur/tâche
+}
+
+model Suggestion {
+  id        String   @id @default(cuid())
+  userId    String
+  familyId  String
+  content   String
+  createdAt DateTime @default(now())
+  user      User     @relation(fields: [userId], references: [id])
+  family    Family   @relation(fields: [familyId], references: [id])
 }

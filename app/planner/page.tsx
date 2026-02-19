@@ -236,6 +236,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   });
   const [pointsHistoryModal, setPointsHistoryModal] = useState<{ userId: string; userName: string } | null>(null);
   const [showQuotaExplain, setShowQuotaExplain] = useState(false);
+  const [showSuggestionModal, setShowSuggestionModal] = useState(false);
+  const [suggestionText, setSuggestionText] = useState("");
+  const [suggestionMessage, setSuggestionMessage] = useState("");
 
   // View mode state (desktop/mobile app) - auto-detect based on screen size
   const [viewMode, setViewMode] = useState<'desktop' | 'mobile'>(() => {
@@ -6078,6 +6081,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         </div>
         <div className={styles.topActions}>
           <button
+            className={styles.themeToggle}
+            onClick={() => setShowSuggestionModal(true)}
+            title="Proposer une idée"
+          >
+            <Icon name="lightbulb" size={18} />
+            <span className={styles.themeLabel}>Idée</span>
+          </button>
+          <button
             className={styles.themeToggle} 
             onClick={() => {
               const newTheme = theme === 'light' ? 'dark' : theme === 'dark' ? 'auto' : 'light';
@@ -6221,6 +6232,77 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 onClick={() => setShowAutoAssignError(false)}
               >
                 Fermer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Suggestion Modal */}
+      {showSuggestionModal && (
+        <div className={styles.modalOverlay} onClick={() => { setShowSuggestionModal(false); setSuggestionMessage(""); }}>
+          <div className={styles.evaluationModal} onClick={e => e.stopPropagation()}>
+            <h3 className={styles.evaluationModalTitle}>Proposer une idée</h3>
+            <p className={styles.evaluationModalSubtitle}>
+              Une idée pour améliorer Fam'Planner ? Partagez-la !
+            </p>
+            <textarea
+              value={suggestionText}
+              onChange={(e) => setSuggestionText(e.target.value)}
+              placeholder="Décrivez votre idée..."
+              rows={4}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-bg-subtle)',
+                color: 'var(--color-text)',
+                fontSize: '0.875rem',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+                marginBottom: '12px',
+              }}
+            />
+            {suggestionMessage && (
+              <p style={{ fontSize: '0.8rem', marginBottom: '12px', color: suggestionMessage.includes('Merci') ? 'var(--color-success, #22c55e)' : 'var(--color-danger, #ef4444)' }}>
+                {suggestionMessage}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                className={styles.autoAssignErrorCancel}
+                onClick={() => { setShowSuggestionModal(false); setSuggestionMessage(""); }}
+              >
+                Annuler
+              </button>
+              <button
+                className={styles.autoAssignErrorBtn}
+                disabled={!suggestionText.trim()}
+                onClick={async () => {
+                  try {
+                    const res = await fetch("/api/suggestions", {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify({
+                        userId: currentUser,
+                        familyId: selectedFamily,
+                        content: suggestionText,
+                      }),
+                    });
+                    if (res.ok) {
+                      setSuggestionMessage("Merci pour votre suggestion !");
+                      setSuggestionText("");
+                      setTimeout(() => { setShowSuggestionModal(false); setSuggestionMessage(""); }, 1500);
+                    } else {
+                      setSuggestionMessage("Erreur lors de l'envoi.");
+                    }
+                  } catch {
+                    setSuggestionMessage("Erreur lors de l'envoi.");
+                  }
+                }}
+              >
+                Envoyer
               </button>
             </div>
           </div>
