@@ -526,6 +526,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
   // Format time for display
   const formatTimeDisplay = (time: string): string => {
+    if (time === '08:00') return 'Matin';
+    if (time === '14:00') return 'Après-midi';
+    if (time === '18:00') return 'Soir';
     const { hours } = parseTime(time);
     if (hours < 12) return `🌅 ${time}`;
     if (hours < 18) return `☀️ ${time}`;
