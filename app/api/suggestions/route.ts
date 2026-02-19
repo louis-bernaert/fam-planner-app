@@ -17,25 +17,22 @@ export async function POST(req: NextRequest) {
       include: { user: { select: { name: true, email: true } } },
     });
 
-    // Send to Google Apps Script webhook if configured
+    // Fire-and-forget: send to Google Apps Script webhook without waiting
     const webhookUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
     if (webhookUrl) {
-      try {
-        await fetch(webhookUrl, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            id: suggestion.id,
-            content: suggestion.content,
-            userName: suggestion.user.name,
-            userEmail: suggestion.user.email,
-            createdAt: suggestion.createdAt.toISOString(),
-          }),
-        });
-      } catch {
-        // Don't fail the request if webhook fails
+      fetch(webhookUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: suggestion.id,
+          content: suggestion.content,
+          userName: suggestion.user.name,
+          userEmail: suggestion.user.email,
+          createdAt: suggestion.createdAt.toISOString(),
+        }),
+      }).catch(() => {
         console.error("Failed to send suggestion to Google Apps Script");
-      }
+      });
     }
 
     return NextResponse.json(suggestion);
