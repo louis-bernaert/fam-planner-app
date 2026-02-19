@@ -2779,7 +2779,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
 
     // Quota équitable par personne = total des points / nombre de membres
-    const lambda = 2.5; // Multiplicateur de charge (modèle multiplicatif)
+    const lambda = 2.2; // Multiplicateur de charge (modèle multiplicatif)
+    const hardBrake = 2.0; // Pénalité linéaire après dépassement de cible
     const gamma = 0.35; // Pénalité de rotation historique
     const epsilon = 0.05; // Seuil de tie-break stochastique
 
@@ -2835,15 +2836,21 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
         // Modèle MULTIPLICATIF : la charge multiplie le coût, ne l'écrase pas
         const chargeMultiplier = 1 + lambda * (loadRatio ** 2);
+        let baseScore = adjustedCost * chargeMultiplier;
+
+        // Hard brake : pénalité linéaire forte après dépassement de cible
+        if (loadRatio > 1) {
+          baseScore += hardBrake * (loadRatio - 1);
+        }
 
         // Pénalité de rotation historique (4 dernières semaines)
         const rotationCount = rotationHistory.get(user.id)?.get(task.id) ?? 0;
         const rotationPenalty = gamma * rotationCount;
 
-        // Score final = coût ajusté × multiplicateur de charge + rotation
-        const decisionScore = adjustedCost * chargeMultiplier + rotationPenalty;
+        // Score final = baseScore + rotation
+        const decisionScore = baseScore + rotationPenalty;
 
-        return { user, personalCost, adjustedCost, decisionScore, currentLoad: userLoad, userTarget, loadRatio, chargeMultiplier, rotationCount, rotationPenalty };
+        return { user, personalCost, adjustedCost, decisionScore, currentLoad: userLoad, userTarget, loadRatio, chargeMultiplier, rotationCount, rotationPenalty, overTarget: loadRatio > 1 };
       });
 
       // [2] Tie-break stochastique : si scores proches, tirage aléatoire
@@ -2857,7 +2864,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
       // Construire la raison détaillée
       const allScoresStr = scored.map(s =>
-        `${s.user.name}: score=${s.decisionScore.toFixed(2)} (coût=${s.personalCost.toFixed(2)}${s.adjustedCost !== s.personalCost ? '→' + s.adjustedCost.toFixed(2) : ''}, charge=${Math.round(s.currentLoad)}/${Math.round(s.userTarget)} pts, ratio=${s.loadRatio.toFixed(2)}, ×${s.chargeMultiplier.toFixed(2)}, rotation=${s.rotationCount}×${gamma})`
+        `${s.user.name}: score=${s.decisionScore.toFixed(2)} (coût=${s.personalCost.toFixed(2)}${s.adjustedCost !== s.personalCost ? '→' + s.adjustedCost.toFixed(2) : ''}, charge=${Math.round(s.currentLoad)}/${Math.round(s.userTarget)} pts, ratio=${s.loadRatio.toFixed(2)}, ×${s.chargeMultiplier.toFixed(2)}${s.overTarget ? ', FREIN+' + (hardBrake * (s.loadRatio - 1)).toFixed(2) : ''}, rot=${s.rotationCount}×${gamma})`
       ).join(' | ');
       const reason = topCandidates.length > 1
         ? `Tie-break entre ${topCandidates.length} candidats → ${picked.user.name} (aléatoire). [${allScoresStr}]`
