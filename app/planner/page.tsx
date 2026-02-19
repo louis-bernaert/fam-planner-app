@@ -170,7 +170,8 @@ export default function PlannerPage() {
     penibility: 30,
   });
   const [newTaskDay, setNewTaskDay] = useState<string>(dayOptions[0]);
-  const [newTaskTime, setNewTaskTime] = useState<string>("08:00");
+  const [newTaskTimeMode, setNewTaskTimeMode] = useState<"slot" | "time">("slot");
+  const [newTaskTime, setNewTaskTime] = useState<string>("Matin");
   const [newTaskSchedules, setNewTaskSchedules] = useState<string[]>([]);
   const [newUnavailable, setNewUnavailable] = useState<string>("");
   const [selectedUser, setSelectedUser] = useState<string>("");
@@ -492,8 +493,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       const parts = matchingSchedule.split(' · ');
       if (parts.length >= 2) {
         const timePart = parts[1];
-        // Handle legacy Matin/Soir format
+        // Handle legacy Matin/Soir format and named slots
         if (timePart === 'Matin') return '08:00';
+        if (timePart === 'Après-midi') return '14:00';
         if (timePart === 'Soir') return '18:00';
         return timePart;
       }
@@ -3540,7 +3542,31 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         <option key={day}>{day}</option>
                       ))}
                     </select>
-                    <input type="time" value={newTaskTime} onChange={(e) => setNewTaskTime(e.target.value)} />
+                    <button
+                      type="button"
+                      className={styles.smallButton}
+                      onClick={() => {
+                        if (newTaskTimeMode === "slot") {
+                          setNewTaskTimeMode("time");
+                          setNewTaskTime("08:00");
+                        } else {
+                          setNewTaskTimeMode("slot");
+                          setNewTaskTime("Matin");
+                        }
+                      }}
+                      title={newTaskTimeMode === "slot" ? "Passer en heure précise" : "Passer en créneau"}
+                    >
+                      <Icon name="clock" size={12} />
+                    </button>
+                    {newTaskTimeMode === "slot" ? (
+                      <select value={newTaskTime} onChange={(e) => setNewTaskTime(e.target.value)}>
+                        <option value="Matin">Matin</option>
+                        <option value="Après-midi">Après-midi</option>
+                        <option value="Soir">Soir</option>
+                      </select>
+                    ) : (
+                      <input type="time" value={newTaskTime} onChange={(e) => setNewTaskTime(e.target.value)} />
+                    )}
                     <button type="button" className={styles.smallButton} onClick={addNewTaskSchedule}>
                       <Icon name="circlePlus" size={12} />
                       Ajouter
@@ -5408,12 +5434,40 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           >
                             {dayOptions.map(d => <option key={d} value={d}>{d}</option>)}
                           </select>
-                          <input
-                            type="time"
-                            className={styles.mobileTimeInput}
-                            value={newTaskTime}
-                            onChange={(e) => setNewTaskTime(e.target.value)}
-                          />
+                          <button
+                            type="button"
+                            className={styles.mobileAddScheduleBtn}
+                            onClick={() => {
+                              if (newTaskTimeMode === "slot") {
+                                setNewTaskTimeMode("time");
+                                setNewTaskTime("08:00");
+                              } else {
+                                setNewTaskTimeMode("slot");
+                                setNewTaskTime("Matin");
+                              }
+                            }}
+                            title={newTaskTimeMode === "slot" ? "Passer en heure précise" : "Passer en créneau"}
+                          >
+                            <Icon name="clock" size={14} />
+                          </button>
+                          {newTaskTimeMode === "slot" ? (
+                            <select
+                              className={styles.mobileSelectCompact}
+                              value={newTaskTime}
+                              onChange={(e) => setNewTaskTime(e.target.value)}
+                            >
+                              <option value="Matin">Matin</option>
+                              <option value="Après-midi">Après-midi</option>
+                              <option value="Soir">Soir</option>
+                            </select>
+                          ) : (
+                            <input
+                              type="time"
+                              className={styles.mobileTimeInput}
+                              value={newTaskTime}
+                              onChange={(e) => setNewTaskTime(e.target.value)}
+                            />
+                          )}
                           <button 
                             className={styles.mobileAddScheduleBtn}
                             onClick={() => {
