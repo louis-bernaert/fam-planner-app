@@ -17,22 +17,24 @@ export async function POST(req: NextRequest) {
       include: { user: { select: { name: true, email: true } } },
     });
 
-    // Fire-and-forget: send to Google Apps Script webhook without waiting
+    // Send to Google Apps Script webhook (awaited so Vercel doesn't kill the function)
     const webhookUrl = process.env.GOOGLE_APPS_SCRIPT_URL;
     if (webhookUrl) {
-      fetch(webhookUrl, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          id: suggestion.id,
-          content: suggestion.content,
-          userName: suggestion.user.name,
-          userEmail: suggestion.user.email,
-          createdAt: suggestion.createdAt.toISOString(),
-        }),
-      }).catch(() => {
+      try {
+        await fetch(webhookUrl, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            id: suggestion.id,
+            content: suggestion.content,
+            userName: suggestion.user.name,
+            userEmail: suggestion.user.email,
+            createdAt: suggestion.createdAt.toISOString(),
+          }),
+        });
+      } catch {
         console.error("Failed to send suggestion to Google Apps Script");
-      });
+      }
     }
 
     return NextResponse.json(suggestion);
