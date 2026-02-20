@@ -2767,9 +2767,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         const key = `${task.id}_${dateStr}`;
         const existing = taskAssignments[key];
         const pts = calculateTaskPoints(task);
-        totalAllTasksPoints += pts;
 
         if (existing && existing.userIds.length > 0) {
+          // Ne compter que les tâches effectivement faites dans le total
+          totalAllTasksPoints += pts;
           for (const uid of existing.userIds) {
             registeredPointsByUser.set(uid, (registeredPointsByUser.get(uid) || 0) + pts);
           }
