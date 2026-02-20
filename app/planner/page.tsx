@@ -4914,6 +4914,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 <h1 className={styles.mobileTitle}>{tabs.find(t => t.id === activeTab)?.shortLabel}</h1>
               </div>
               <div className={styles.mobileActions}>
+                <button className={styles.mobileIconBtn} onClick={() => setShowSuggestionModal(true)} title="Proposer une idée">
+                  <Icon name="lightbulb" size={20} />
+                </button>
                 <Link href="/settings" className={styles.mobileIconBtn} title="Paramètres">
                   <Icon name="gear" size={20} />
                 </Link>

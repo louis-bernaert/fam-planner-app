@@ -755,11 +755,28 @@
   background-color: var(--color-primary-hover);
 }
 
+/* Theme icon hidden on desktop, visible on mobile */
+.themeIconMobile {
+  display: none;
+}
+
 @media (max-width: 640px) {
   .themeOptions {
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(3, 1fr);
   }
-  
+
+  .themeOption {
+    padding: var(--space-3);
+  }
+
+  .themePreview {
+    display: none;
+  }
+
+  .themeIconMobile {
+    display: block;
+  }
+
   .colorGrid {
     grid-template-columns: repeat(3, 1fr);
   }

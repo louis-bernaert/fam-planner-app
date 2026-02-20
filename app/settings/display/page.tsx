@@ -79,61 +79,6 @@ export default function DisplaySettingsPage() {
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>
-          <Icon name="sun" size={18} />
-          Mode de luminosité
-        </h2>
-        <p className={styles.sectionDesc}>Choisissez le thème par défaut de l'interface</p>
-
-        <div className={styles.themeOptions}>
-          <button
-            type="button"
-            className={`${styles.themeOption} ${themeMode === "light" ? styles.active : ""}`}
-            onClick={() => setThemeMode("light")}
-          >
-            <div className={styles.themePreview} data-preview="light">
-              <div className={styles.previewHeader}></div>
-              <div className={styles.previewContent}>
-                <div className={styles.previewLine}></div>
-                <div className={styles.previewLine}></div>
-              </div>
-            </div>
-            <span>Clair</span>
-          </button>
-
-          <button
-            type="button"
-            className={`${styles.themeOption} ${themeMode === "dark" ? styles.active : ""}`}
-            onClick={() => setThemeMode("dark")}
-          >
-            <div className={styles.themePreview} data-preview="dark">
-              <div className={styles.previewHeader}></div>
-              <div className={styles.previewContent}>
-                <div className={styles.previewLine}></div>
-                <div className={styles.previewLine}></div>
-              </div>
-            </div>
-            <span>Sombre</span>
-          </button>
-
-          <button
-            type="button"
-            className={`${styles.themeOption} ${themeMode === "system" ? styles.active : ""}`}
-            onClick={() => setThemeMode("system")}
-          >
-            <div className={styles.themePreview} data-preview="system">
-              <div className={styles.previewHeader}></div>
-              <div className={styles.previewContent}>
-                <div className={styles.previewLine}></div>
-                <div className={styles.previewLine}></div>
-              </div>
-            </div>
-            <span>Système</span>
-          </button>
-        </div>
-      </div>
-
-      <div className={styles.section}>
-        <h2 className={styles.sectionTitle}>
           <Icon name="palette" size={18} />
           Couleur d'accent
         </h2>
@@ -158,6 +103,64 @@ export default function DisplaySettingsPage() {
               )}
             </button>
           ))}
+        </div>
+      </div>
+
+      <div className={styles.section}>
+        <h2 className={styles.sectionTitle}>
+          <Icon name="sun" size={18} />
+          Mode de luminosité
+        </h2>
+        <p className={styles.sectionDesc}>Choisissez le thème par défaut de l'interface</p>
+
+        <div className={styles.themeOptions}>
+          <button
+            type="button"
+            className={`${styles.themeOption} ${themeMode === "light" ? styles.active : ""}`}
+            onClick={() => setThemeMode("light")}
+          >
+            <div className={styles.themePreview} data-preview="light">
+              <div className={styles.previewHeader}></div>
+              <div className={styles.previewContent}>
+                <div className={styles.previewLine}></div>
+                <div className={styles.previewLine}></div>
+              </div>
+            </div>
+            <Icon name="sun" size={20} className={styles.themeIconMobile} />
+            <span className={styles.themeLabel}>Clair</span>
+          </button>
+
+          <button
+            type="button"
+            className={`${styles.themeOption} ${themeMode === "dark" ? styles.active : ""}`}
+            onClick={() => setThemeMode("dark")}
+          >
+            <div className={styles.themePreview} data-preview="dark">
+              <div className={styles.previewHeader}></div>
+              <div className={styles.previewContent}>
+                <div className={styles.previewLine}></div>
+                <div className={styles.previewLine}></div>
+              </div>
+            </div>
+            <Icon name="moon" size={20} className={styles.themeIconMobile} />
+            <span className={styles.themeLabel}>Sombre</span>
+          </button>
+
+          <button
+            type="button"
+            className={`${styles.themeOption} ${themeMode === "system" ? styles.active : ""}`}
+            onClick={() => setThemeMode("system")}
+          >
+            <div className={styles.themePreview} data-preview="system">
+              <div className={styles.previewHeader}></div>
+              <div className={styles.previewContent}>
+                <div className={styles.previewLine}></div>
+                <div className={styles.previewLine}></div>
+              </div>
+            </div>
+            <Icon name="circleHalfStroke" size={20} className={styles.themeIconMobile} />
+            <span className={styles.themeLabel}>Système</span>
+          </button>
         </div>
       </div>
 
