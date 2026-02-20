@@ -1219,6 +1219,48 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
   };
 
+  // Undo a delegation: put task back in "Tâches à valider" for current user
+  const undelegateTask = (taskId: string, date: Date) => {
+    if (!currentUser) return;
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const dateStr = `${year}-${month}-${day}`;
+
+    // Find the current user's delegation record to get delegatedTo
+    const myRecord = validatedTasks.find(v => v.taskId === taskId && v.date === dateStr && v.userId === currentUser && v.delegatedTo !== undefined);
+    const delegatedToUserId = myRecord?.delegatedTo;
+
+    setValidatedTasks(prev => {
+      let newState = prev;
+      // Remove delegatedTo from current user's record (back to pending)
+      newState = newState.map(v => {
+        if (v.taskId === taskId && v.date === dateStr && v.userId === currentUser) {
+          const { delegatedTo, ...rest } = v;
+          return { ...rest, validated: false, validatedAt: undefined };
+        }
+        return v;
+      });
+      // Remove the delegated user's record
+      if (delegatedToUserId) {
+        newState = newState.filter(v => !(v.taskId === taskId && v.date === dateStr && v.userId === delegatedToUserId && v.delegatedFrom));
+      }
+      return newState;
+    });
+
+    // Persist: delete current user's delegation record, re-create as simple pending
+    fetch(`/api/task-validations?taskId=${taskId}&date=${dateStr}&userId=${currentUser}`, {
+      method: 'DELETE',
+    }).catch(() => {});
+
+    // Delete the delegated user's record
+    if (delegatedToUserId) {
+      fetch(`/api/task-validations?taskId=${taskId}&date=${dateStr}&userId=${delegatedToUserId}`, {
+        method: 'DELETE',
+      }).catch(() => {});
+    }
+  };
+
   // Get tasks delegated to the current user from others
   const getDelegatedToMeTasks = () => {
     if (!currentUser) return [];
@@ -3451,15 +3493,29 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               <span className={styles.taskMeta}>{item.task.duration} min</span>
                             </div>
                             <div className={styles.validationBtns}>
-                              <span style={{ 
-                                padding: '0.25rem 0.5rem', 
-                                fontSize: '0.75rem', 
+                              <span style={{
+                                padding: '0.25rem 0.5rem',
+                                fontSize: '0.75rem',
                                 color: item.delegatedToName ? 'var(--color-primary)' : 'var(--color-text-muted)',
                                 backgroundColor: item.delegatedToName ? 'var(--color-primary-subtle)' : 'var(--color-bg-subtle)',
                                 borderRadius: '4px'
                               }}>
                                 {item.delegatedToName ? `Fait par ${item.delegatedToName}` : 'Non fait'}
                               </span>
+                              <button
+                                onClick={() => undelegateTask(item.task.id, item.date)}
+                                title="Annuler la délégation"
+                                style={{
+                                  border: '1px solid #000',
+                                  backgroundColor: '#fff',
+                                  color: '#000',
+                                  padding: '4px',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Icon name="xmark" size={12} />
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -5026,6 +5082,26 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         À valider
                       </h3>
                       <div className={styles.mobileTaskList}>
+                        {/* Delegated tasks from others */}
+                        {getDelegatedToMeTasks().map((item, idx) => (
+                          <div key={`delegated-mobile-${idx}`} className={styles.mobileValidateItem} style={{ borderLeftColor: 'var(--color-primary)', borderLeftWidth: '3px', borderLeftStyle: 'solid' }}>
+                            <div className={styles.mobileTaskLeft}>
+                              <span className={styles.mobileTaskTitle}>{item.task.title}</span>
+                              <span className={styles.mobileTaskMeta} style={{ color: 'var(--color-primary)' }}>
+                                Délégué par {item.delegatorName}
+                              </span>
+                            </div>
+                            <div className={styles.mobileValidateBtns}>
+                              <button
+                                className={styles.mobileValidateYes}
+                                onClick={() => validateTask(item.task.id, item.date, true)}
+                              >
+                                <Icon name="check" size={16} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                        {/* Own pending tasks */}
                         {getMyPastTasks().filter(t => !t.validated).slice(0, 3).map((item, idx) => (
                           <div key={`validate-${idx}`} className={styles.mobileValidateItem}>
                             <div className={styles.mobileTaskLeft}>
@@ -5055,15 +5131,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   )}
 
                   {/* Validation History - Collapsible */}
-                  {currentUser && getUserPointsHistory(currentUser).length > 0 && (
+                  {currentUser && (getUserPointsHistory(currentUser).length > 0 || getMyDelegatedTasks().length > 0) && (
                     <div className={styles.mobileSection}>
-                      <button 
+                      <button
                         className={styles.mobileHistoryToggle}
                         onClick={() => setMobileHistoryOpen(!mobileHistoryOpen)}
                       >
                         <div className={styles.mobileHistoryToggleLeft}>
                           <Icon name="check" size={16} />
-                          <span>Historique validé ({getUserPointsHistory(currentUser).length})</span>
+                          <span>Historique ({getUserPointsHistory(currentUser).length + getMyDelegatedTasks().length})</span>
                         </div>
                         <Icon name={mobileHistoryOpen ? "chevronDown" : "chevronRight"} size={16} />
                       </button>
@@ -5079,7 +5155,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               </div>
                               <div className={styles.mobileHistoryRight}>
                                 <span className={styles.mobileHistoryPoints}>+{item.points}</span>
-                                <button 
+                                <button
                                   className={styles.mobileCancelValidationBtn}
                                   onClick={() => {
                                     const task = tasks.find(t => t.title === item.title);
@@ -5088,6 +5164,26 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                     }
                                   }}
                                   title="Annuler la validation"
+                                >
+                                  <Icon name="x" size={12} />
+                                </button>
+                              </div>
+                            </div>
+                          ))}
+                          {/* Delegated tasks */}
+                          {getMyDelegatedTasks().map((item, idx) => (
+                            <div key={`delegated-hist-${idx}`} className={styles.mobileHistoryItem} style={{ opacity: 0.7 }}>
+                              <div className={styles.mobileTaskLeft}>
+                                <span className={styles.mobileTaskTitle}>{item.task.title}</span>
+                                <span className={styles.mobileTaskMeta} style={{ color: item.delegatedToName ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
+                                  {item.delegatedToName ? `Fait par ${item.delegatedToName}` : 'Non fait'}
+                                </span>
+                              </div>
+                              <div className={styles.mobileHistoryRight}>
+                                <button
+                                  className={styles.mobileCancelValidationBtn}
+                                  onClick={() => undelegateTask(item.task.id, item.date)}
+                                  title="Annuler la délégation"
                                 >
                                   <Icon name="x" size={12} />
                                 </button>
