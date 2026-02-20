@@ -2929,7 +2929,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     });
 
     // Sauvegarder les attributions
-    const saveAssignments = async () => {
+    const saveAssignments = () => {
       // Mise à jour locale IMMÉDIATE (avant les appels API)
       setTaskAssignments(prev => {
         const updated = { ...prev };
@@ -2979,42 +2979,26 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         }
       });
 
-      // Appels API en arrière-plan
-      try {
-        let successCount = 0;
-        let errorCount = 0;
+      // Afficher le toast immédiatement
+      setToastMessage({
+        type: 'success',
+        text: `${newAssignments.length} tâches attribuées jusqu'à dimanche (${Math.round(totalWeeklyPoints)} pts répartis)`,
+        details
+      });
 
-        for (const assignment of newAssignments) {
-          const response = await fetch('/api/task-registrations', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              taskId: assignment.taskId,
-              userId: assignment.userId,
-              date: assignment.date
-            }),
-          });
-
-          if (response.ok) {
-            successCount++;
-          } else {
-            errorCount++;
-            console.error('Registration failed:', assignment);
-          }
-        }
-
-        if (errorCount === 0) {
-          setToastMessage({
-            type: 'success',
-            text: `${successCount} tâches attribuées jusqu'à dimanche (${Math.round(totalWeeklyPoints)} pts répartis)`,
-            details
-          });
-        } else {
-          setToastMessage({ type: 'error', text: `${successCount} tâche(s) attribuée(s), mais ${errorCount} ont échoué.` });
-        }
-      } catch (error) {
-        console.error("Failed to save assignments", error);
-        setToastMessage({ type: 'error', text: 'Erreur réseau lors de la sauvegarde. Vérifiez votre connexion et réessayez.' });
+      // Sauvegarder en arrière-plan (sans bloquer l'UI)
+      for (const assignment of newAssignments) {
+        fetch('/api/task-registrations', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            taskId: assignment.taskId,
+            userId: assignment.userId,
+            date: assignment.date
+          }),
+        }).catch(() => {
+          console.error('Registration failed:', assignment);
+        });
       }
     };
 
