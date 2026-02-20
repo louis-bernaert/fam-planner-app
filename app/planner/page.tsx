@@ -2118,7 +2118,6 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           name: newAccount.name.trim(),
           email: newAccount.email.trim(),
           password: newAccount.password,
-          familyName: families.find((f) => f.id === newAccount.familyId)?.name ?? "Famille",
         }),
       });
 
@@ -2129,11 +2128,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         return;
       }
 
-      const { user, family } = data;
-      mergeAuthUser(user, family);
+      const { user } = data;
+      mergeAuthUser(user);
       setCurrentUser(user.id);
       setSelectedUser(user.id);
-      setNewAccount({ name: "", email: "", password: "", familyId: family?.id ?? selectedFamily });
+      setNewAccount({ name: "", email: "", password: "", familyId: selectedFamily });
       setAuthView("login");
       setAuthMessage("Compte créé et connecté.");
       setAuthError("");

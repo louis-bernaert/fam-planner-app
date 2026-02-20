@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { email, password, name, familyName } = body ?? {};
+    const { email, password, name } = body ?? {};
 
     if (!email || !password || !name) {
       return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
@@ -17,23 +17,12 @@ export async function POST(request: Request) {
     }
 
     const hash = await bcrypt.hash(password, 10);
-    const family = await prisma.family.create({
-      data: {
-        name: familyName || "Famille",
-      },
-    });
 
     const user = await prisma.user.create({
       data: {
         email: email.toLowerCase(),
         name,
         passwordHash: hash,
-        memberships: {
-          create: {
-            familyId: family.id,
-            role: "owner",
-          },
-        },
       },
       include: { memberships: true },
     });
@@ -42,11 +31,11 @@ export async function POST(request: Request) {
       id: user.id,
       name: user.name,
       email: user.email,
-      familyIds: user.memberships.map((m) => m.familyId),
+      familyIds: [],
       points: user.points,
     };
 
-    return NextResponse.json({ user: cleanUser, family });
+    return NextResponse.json({ user: cleanUser });
   } catch (error) {
     console.error("/api/auth/signup error", error);
     return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
