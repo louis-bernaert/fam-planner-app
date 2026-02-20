@@ -1299,6 +1299,26 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       .filter(Boolean) as { task: Task; date: Date; validation: ValidatedTask; delegatedToName: string | null }[];
   };
 
+  // Get tasks delegated to me that I accepted (for history)
+  const getAcceptedDelegationsToMe = () => {
+    if (!currentUser) return [];
+    return validatedTasks
+      .filter(v => v.userId === currentUser && v.delegatedFrom && v.validated)
+      .map(v => {
+        const task = tasks.find(t => t.id === v.taskId);
+        if (!task) return null;
+        const delegator = users.find(m => m.id === v.delegatedFrom);
+        return {
+          task,
+          date: new Date(v.date),
+          validation: v,
+          delegatorName: delegator?.name || 'Quelqu\'un',
+          points: calculateTaskPoints(task)
+        };
+      })
+      .filter(Boolean) as { task: Task; date: Date; validation: ValidatedTask; delegatorName: string; points: number }[];
+  };
+
   const addExceptionalTask = () => {
     if (!currentUser || !newExceptionalTask.title.trim()) return;
     
@@ -3434,14 +3454,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 )}
 
                 {/* Tâches passées déjà validées - menu déroulant */}
-                {(getMyPastTasks().filter(t => t.validated).length > 0 || getMyDelegatedTasks().length > 0) && (
+                {(getMyPastTasks().filter(t => t.validated).length > 0 || getMyDelegatedTasks().length > 0 || getAcceptedDelegationsToMe().length > 0) && (
                   <div className={styles.monEspaceSection}>
-                    <button 
+                    <button
                       className={styles.togglePastBtn}
                       onClick={() => setShowPastTasks(!showPastTasks)}
                       style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                      <Icon name={showPastTasks ? "chevronDown" : "chevronRight"} size={12} />Historique ({getMyPastTasks().filter(t => t.validated).length + getMyDelegatedTasks().length})
+                      <Icon name={showPastTasks ? "chevronDown" : "chevronRight"} size={12} />Historique ({getMyPastTasks().filter(t => t.validated).length + getMyDelegatedTasks().length + getAcceptedDelegationsToMe().length})
                     </button>
                     
                     {showPastTasks && (
@@ -3505,6 +3525,41 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               <button
                                 onClick={() => undelegateTask(item.task.id, item.date)}
                                 title="Annuler la délégation"
+                                style={{
+                                  border: '1px solid #000',
+                                  backgroundColor: '#fff',
+                                  color: '#000',
+                                  padding: '4px',
+                                  borderRadius: '4px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                <Icon name="xmark" size={12} />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+
+                        {/* Tâches déléguées vers moi que j'ai acceptées */}
+                        {getAcceptedDelegationsToMe().map((item, idx) => (
+                          <div key={`accepted-${item.task.id}-${idx}`} className={`${styles.myTaskCard} ${styles.validatedTask}`}>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '70px' }}>
+                              <span style={{ fontWeight: 500 }}>
+                                {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
+                              </span>
+                              <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)' }}>
+                                Via {item.delegatorName}
+                              </span>
+                            </div>
+                            <div className={styles.myTaskInfo}>
+                              <strong>{item.task.title}</strong>
+                              <span className={styles.taskMeta}>{item.task.duration} min</span>
+                            </div>
+                            <div className={styles.validationBtns}>
+                              <span className={styles.validatedBadge}><Icon name="check" size={12} style={{ marginRight: '4px' }} />+{item.points} pts</span>
+                              <button
+                                onClick={() => validateTask(item.task.id, item.date, false)}
+                                title="Annuler la validation"
                                 style={{
                                   border: '1px solid #000',
                                   backgroundColor: '#fff',
