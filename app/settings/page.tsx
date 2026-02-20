@@ -1,10 +1,18 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./settings.module.css";
 import Icon from "../components/Icon";
 
 export default function SettingsPage() {
+  const router = useRouter();
+
+  const handleLogout = () => {
+    window.localStorage.removeItem("sessionUser");
+    router.replace("/");
+  };
+
   return (
     <div className={styles.container}>
       <div className={styles.header}>
@@ -53,6 +61,12 @@ export default function SettingsPage() {
           <Icon name="arrowLeft" size={14} style={{ marginRight: '6px' }} />
           Retour au planner
         </Link>
+      </div>
+
+      <div className={styles.backLink}>
+        <button className={styles.btnDanger} onClick={handleLogout}>
+          Se déconnecter
+        </button>
       </div>
     </div>
   );

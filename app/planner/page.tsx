@@ -6115,7 +6115,6 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             <Icon name="gear" size={18} />
           </Link>
           {currentUserEntity && <span className={styles.userChip}>{currentUserEntity.name}</span>}
-          <button className={styles.logout} onClick={logout}>Se déconnecter</button>
         </div>
       </header>
 
