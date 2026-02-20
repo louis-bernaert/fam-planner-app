@@ -3,24 +3,23 @@
    =========================================== */
 
 .container {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-8) var(--space-5);
+  max-width: 800px;
+  margin: 0 auto;
   min-height: 100vh;
-  background: var(--color-bg);
-  padding-bottom: var(--space-8);
 }
 
 /* Header */
 .header {
-  background: var(--color-surface);
-  border-bottom: 1px solid var(--color-border);
-  padding: var(--space-4) var(--space-5);
-  position: sticky;
-  top: 0;
-  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
 }
 
 .headerContent {
-  max-width: 600px;
-  margin: 0 auto;
   display: flex;
   align-items: center;
   gap: var(--space-4);
@@ -32,21 +31,23 @@
   justify-content: center;
   width: 36px;
   height: 36px;
-  background: var(--color-bg);
+  background-color: var(--color-surface);
   border: 1px solid var(--color-border);
-  border-radius: 50%;
-  color: var(--color-text-secondary);
+  border-radius: var(--radius-full);
+  color: var(--color-text);
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: all var(--transition-fast);
+  flex-shrink: 0;
 }
 
 .backBtn:hover {
+  background-color: var(--color-primary);
   border-color: var(--color-primary);
-  color: var(--color-primary);
+  color: white;
 }
 
 .headerTitle {
-  font-size: 1.25rem;
+  font-size: 1.5rem;
   font-weight: 600;
   color: var(--color-text);
   margin: 0;
@@ -54,9 +55,9 @@
 
 /* Main content */
 .content {
-  max-width: 600px;
-  margin: 0 auto;
-  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
 }
 
 /* Toast message */
@@ -547,8 +548,8 @@
 
 /* Responsive */
 @media (max-width: 640px) {
-  .content {
-    padding: var(--space-4);
+  .container {
+    padding: var(--space-5) var(--space-4);
   }
 
   .periodGrid {
