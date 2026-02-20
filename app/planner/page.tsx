@@ -4898,6 +4898,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   // Mobile view - iPhone frame
   if (viewMode === 'mobile') {
     return (
+      <>
       <div className={styles.mobileWrapper}>
         <div className={styles.phoneFrame}>
           <div className={styles.phoneDynamicIsland}></div>
@@ -6084,6 +6085,72 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           </div>
         </div>
       </div>
+
+      {/* Suggestion Modal (mobile) */}
+      {showSuggestionModal && (
+        <div className={styles.modalOverlay} onClick={() => { setShowSuggestionModal(false); setSuggestionMessage(""); }}>
+          <div className={styles.evaluationModal} onClick={e => e.stopPropagation()}>
+            <h3 className={styles.evaluationModalTitle}>Proposer une idée</h3>
+            <p className={styles.evaluationModalSubtitle}>
+              Une idée pour améliorer Fam'Planner ? Partagez-la !
+            </p>
+            <textarea
+              value={suggestionText}
+              onChange={(e) => setSuggestionText(e.target.value)}
+              placeholder="Décrivez votre idée..."
+              rows={4}
+              style={{
+                width: '100%',
+                padding: '10px',
+                borderRadius: '8px',
+                border: '1px solid var(--color-border)',
+                backgroundColor: 'var(--color-bg-subtle)',
+                color: 'var(--color-text)',
+                fontSize: '0.875rem',
+                resize: 'vertical',
+                fontFamily: 'inherit',
+                marginBottom: '12px',
+              }}
+            />
+            {suggestionMessage && (
+              <p style={{ fontSize: '0.8rem', marginBottom: '12px', color: suggestionMessage.includes('Merci') ? 'var(--color-success, #22c55e)' : 'var(--color-danger, #ef4444)' }}>
+                {suggestionMessage}
+              </p>
+            )}
+            <div style={{ display: 'flex', gap: '8px', justifyContent: 'flex-end' }}>
+              <button
+                className={styles.autoAssignErrorCancel}
+                onClick={() => { setShowSuggestionModal(false); setSuggestionMessage(""); }}
+              >
+                Annuler
+              </button>
+              <button
+                className={styles.autoAssignErrorBtn}
+                disabled={!suggestionText.trim() || suggestionMessage === "Merci pour votre suggestion !"}
+                onClick={() => {
+                  const content = suggestionText.trim();
+                  if (!content) return;
+                  setSuggestionMessage("Merci pour votre suggestion !");
+                  setSuggestionText("");
+                  setTimeout(() => { setShowSuggestionModal(false); setSuggestionMessage(""); }, 1500);
+                  fetch("/api/suggestions", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      userId: currentUser,
+                      familyId: selectedFamily,
+                      content,
+                    }),
+                  }).catch(() => {});
+                }}
+              >
+                Envoyer
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      </>
     );
   }
 
