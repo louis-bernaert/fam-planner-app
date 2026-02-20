@@ -15,8 +15,11 @@ export default function SettingsPage() {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h1>Paramètres</h1>
+      <div className={styles.pageHeader}>
+        <Link href="/planner" className={styles.backButtonArrow}>
+          <Icon name="arrowLeft" size={20} />
+        </Link>
+        <h1 className={styles.pageTitle}>Paramètres</h1>
       </div>
 
       <div className={styles.settingsGrid}>
@@ -53,13 +56,6 @@ export default function SettingsPage() {
             <Icon name="trophy" size={24} />
           </div>
           <span className={styles.gridLabel}>Points</span>
-        </Link>
-      </div>
-
-      <div className={styles.backLink}>
-        <Link href="/planner">
-          <Icon name="arrowLeft" size={14} style={{ marginRight: '6px' }} />
-          Retour au planner
         </Link>
       </div>
 
