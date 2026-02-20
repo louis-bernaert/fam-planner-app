@@ -240,14 +240,12 @@ export default function PointsSettingsPage() {
   return (
     <div className={styles.container}>
       {/* Header */}
-      <header className={styles.header}>
-        <div className={styles.headerContent}>
-          <Link href="/settings" className={styles.backBtn}>
-            <Icon name="arrowLeft" size={16} />
-          </Link>
-          <h1 className={styles.headerTitle}>Réglages des points</h1>
-        </div>
-      </header>
+      <div className={styles.pageHeader}>
+        <Link href="/settings" className={styles.backButtonArrow}>
+          <Icon name="arrowLeft" size={20} />
+        </Link>
+        <h1 className={styles.pageTitle}>Réglages des points</h1>
+      </div>
 
       {/* Content */}
       <div className={styles.content}>

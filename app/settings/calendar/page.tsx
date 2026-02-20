@@ -101,14 +101,11 @@ export default function CalendarSettingsPage() {
   if (!selectedFamily) {
     return (
       <div className={styles.container}>
-        <div className={styles.header}>
-          <h1>Paramètres du calendrier</h1>
-          <p className={styles.subtitle}>Veuillez d'abord sélectionner une famille dans le planner.</p>
-        </div>
-        <div className={styles.backLinkArrow}>
-          <Link href="/settings">
+        <div className={styles.pageHeader}>
+          <Link href="/settings" className={styles.backButtonArrow}>
             <Icon name="arrowLeft" size={20} />
           </Link>
+          <h1 className={styles.pageTitle}>Paramètres du calendrier</h1>
         </div>
       </div>
     );
@@ -116,9 +113,11 @@ export default function CalendarSettingsPage() {
 
   return (
     <div className={styles.container}>
-      <div className={styles.header}>
-        <h1>Paramètres du calendrier</h1>
-        <p className={styles.subtitle}>Configurez les couleurs et liens iCal pour chaque membre</p>
+      <div className={styles.pageHeader}>
+        <Link href="/settings" className={styles.backButtonArrow}>
+          <Icon name="arrowLeft" size={20} />
+        </Link>
+        <h1 className={styles.pageTitle}>Paramètres du calendrier</h1>
       </div>
 
       <div className={styles.section}>
@@ -212,11 +211,6 @@ export default function CalendarSettingsPage() {
         )}
       </div>
 
-      <div className={styles.backLinkArrow}>
-        <Link href="/settings">
-          <Icon name="arrowLeft" size={20} />
-        </Link>
-      </div>
     </div>
   );
 }

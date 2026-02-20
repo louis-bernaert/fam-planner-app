@@ -70,14 +70,11 @@ export default function DisplaySettingsPage() {
 
   return (
     <div className={styles.container}>
-      <div className={styles.displayHeader}>
-        <Link href="/settings" className={styles.backBtn}>
-          <Icon name="arrowLeft" size={16} />
+      <div className={styles.pageHeader}>
+        <Link href="/settings" className={styles.backButtonArrow}>
+          <Icon name="arrowLeft" size={20} />
         </Link>
-        <div>
-          <h1>Réglages affichage</h1>
-          <p className={styles.subtitle}>Personnalisez l'apparence de l'application</p>
-        </div>
+        <h1 className={styles.pageTitle}>Réglages affichage</h1>
       </div>
 
       <div className={styles.section}>
