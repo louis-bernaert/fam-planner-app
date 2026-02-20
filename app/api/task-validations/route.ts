@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
 // POST - Valider une tâche effectuée
 export async function POST(req: NextRequest) {
   try {
-    const { taskId, userId, date, validated } = await req.json();
+    const { taskId, userId, date, validated, delegatedTo, delegatedFrom } = await req.json();
 
     if (!taskId || !userId || !date) {
       return NextResponse.json(
@@ -52,17 +52,20 @@ export async function POST(req: NextRequest) {
     // Upsert: créer ou mettre à jour la validation
     const validation = await prisma.taskValidation.upsert({
       where: {
-        taskId_date: { taskId, date },
+        taskId_date_userId: { taskId, date, userId },
       },
       update: {
-        userId,
         validated: validated !== undefined ? validated : true,
+        ...(delegatedTo !== undefined && { delegatedTo }),
+        ...(delegatedFrom !== undefined && { delegatedFrom }),
       },
       create: {
         taskId,
         userId,
         date,
         validated: validated !== undefined ? validated : true,
+        ...(delegatedTo !== undefined && { delegatedTo }),
+        ...(delegatedFrom !== undefined && { delegatedFrom }),
       },
       include: {
         user: {
@@ -89,17 +92,18 @@ export async function DELETE(req: NextRequest) {
   try {
     const taskId = req.nextUrl.searchParams.get("taskId");
     const date = req.nextUrl.searchParams.get("date");
+    const userId = req.nextUrl.searchParams.get("userId");
 
-    if (!taskId || !date) {
+    if (!taskId || !date || !userId) {
       return NextResponse.json(
-        { error: "taskId and date are required" },
+        { error: "taskId, date, and userId are required" },
         { status: 400 }
       );
     }
 
     await prisma.taskValidation.delete({
       where: {
-        taskId_date: { taskId, date },
+        taskId_date_userId: { taskId, date, userId },
       },
     });
 

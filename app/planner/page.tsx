@@ -1055,7 +1055,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           const todayMonth = String(today.getMonth() + 1).padStart(2, '0');
           const todayDay = String(today.getDate()).padStart(2, '0');
           const todayStr = `${todayYear}-${todayMonth}-${todayDay}`;
-          const validation = validatedTasks.find(v => v.taskId === task.id && v.date === todayStr);
+          const validation = validatedTasks.find(v => v.taskId === task.id && v.date === todayStr && v.userId === currentUser);
+          // Skip if already delegated (handled via getMyDelegatedTasks)
+          if (validation?.delegatedTo !== undefined) return;
           pastTasks.push({
             task,
             date: new Date(today),
@@ -1081,7 +1083,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           const checkMonth = String(checkDate.getMonth() + 1).padStart(2, '0');
           const checkDay = String(checkDate.getDate()).padStart(2, '0');
           const checkDateStr = `${checkYear}-${checkMonth}-${checkDay}`;
-          const validation = validatedTasks.find(v => v.taskId === task.id && v.date === checkDateStr);
+          const validation = validatedTasks.find(v => v.taskId === task.id && v.date === checkDateStr && v.userId === currentUser);
+          // Skip if already delegated (handled via getMyDelegatedTasks)
+          if (validation?.delegatedTo !== undefined) return;
           pastTasks.push({
             task,
             date: new Date(checkDate),
@@ -1129,7 +1133,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         });
       } else {
         // If marking as not validated, delete the validation
-        await fetch(`/api/task-validations?taskId=${taskId}&date=${dateStr}`, {
+        await fetch(`/api/task-validations?taskId=${taskId}&date=${dateStr}&userId=${currentUser}`, {
           method: 'DELETE',
         });
       }
@@ -1145,7 +1149,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
-    
+
     setValidatedTasks(prev => {
       // Mark as not done for current user, with delegation info
       const existingIdx = prev.findIndex(v => v.taskId === taskId && v.date === dateStr && v.userId === currentUser);
@@ -1157,11 +1161,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         validatedAt: new Date().toISOString(),
         delegatedTo: delegatedToUserId
       };
-      
-      let newState = existingIdx >= 0 
+
+      let newState = existingIdx >= 0
         ? prev.map((v, i) => i === existingIdx ? myValidation : v)
         : [...prev, myValidation];
-      
+
       // If delegated to someone, create a pending validation for them
       if (delegatedToUserId) {
         const delegatedValidation: ValidatedTask = {
@@ -1174,16 +1178,45 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         // Check if they already have this task
         const theirExisting = newState.findIndex(v => v.taskId === taskId && v.date === dateStr && v.userId === delegatedToUserId);
         if (theirExisting >= 0) {
-          newState = newState.map((v, i) => i === theirExisting ? { ...v, delegatedFrom: currentUser! } : v);
+          newState = newState.map((v, i) => i === theirExisting ? { ...v, delegatedFrom: currentUser!, validated: false } : v);
         } else {
           newState = [...newState, delegatedValidation];
         }
       }
-      
+
       return newState;
     });
-    
+
     setDelegationMenu(null);
+
+    // Persist to API
+    // 1. Save current user's validation (not done, delegated)
+    fetch('/api/task-validations', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        taskId,
+        userId: currentUser,
+        date: dateStr,
+        validated: false,
+        delegatedTo: delegatedToUserId,
+      }),
+    }).catch(() => {});
+
+    // 2. If delegated to someone, create their pending validation
+    if (delegatedToUserId) {
+      fetch('/api/task-validations', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId,
+          userId: delegatedToUserId,
+          date: dateStr,
+          validated: false,
+          delegatedFrom: currentUser,
+        }),
+      }).catch(() => {});
+    }
   };
 
   // Get tasks delegated to the current user from others
@@ -1799,12 +1832,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   userId: v.userId,
                   date: v.date,
                   validated: v.validated,
-                  validatedAt: v.createdAt || v.validatedAt, // Include timestamp for history
+                  validatedAt: v.createdAt || v.validatedAt,
+                  delegatedTo: v.delegatedTo ?? undefined,
+                  delegatedFrom: v.delegatedFrom ?? undefined,
                 }));
                 setValidatedTasks(prev => {
-                  // Merge without duplicates
-                  const existing = new Set(prev.map(v => `${v.taskId}-${v.date}`));
-                  const newOnes = loadedValidations.filter(v => !existing.has(`${v.taskId}-${v.date}`));
+                  // Merge without duplicates (key: taskId-date-userId)
+                  const existing = new Set(prev.map(v => `${v.taskId}-${v.date}-${v.userId}`));
+                  const newOnes = loadedValidations.filter(v => !existing.has(`${v.taskId}-${v.date}-${v.userId}`));
                   return [...prev, ...newOnes];
                 });
               }

@@ -92,16 +92,18 @@ model TaskRegistration {
 
 // Validation d'une tâche effectuée
 model TaskValidation {
-  id        String   @id @default(cuid())
-  taskId    String
-  userId    String
-  date      String   // Format YYYY-MM-DD
-  validated Boolean  @default(true)
-  task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
-  user      User     @relation(fields: [userId], references: [id])
-  createdAt DateTime @default(now())
+  id            String   @id @default(cuid())
+  taskId        String
+  userId        String
+  date          String   // Format YYYY-MM-DD
+  validated     Boolean  @default(true)
+  delegatedTo   String?  // userId of person who actually did it
+  delegatedFrom String?  // userId of person who delegated
+  task          Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user          User     @relation(fields: [userId], references: [id])
+  createdAt     DateTime @default(now())
 
-  @@unique([taskId, date]) // Une seule validation par tâche/date
+  @@unique([taskId, date, userId]) // Une validation par tâche/date/utilisateur
 }
 
 model Unavailability {
