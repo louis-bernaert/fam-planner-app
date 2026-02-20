@@ -2750,6 +2750,34 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     const startOffset = todayDow === 0 ? 1 : 0;
     const endOffset = todayDow === 0 ? 7 : (7 - todayDow);
 
+    // Jours passés (lundi → hier) : compter les points inscrits + total
+    const mondayOffset = todayDow === 0 ? 1 : -(todayDow - 1);
+    for (let dayOffset = mondayOffset; dayOffset < startOffset; dayOffset++) {
+      const date = new Date();
+      date.setDate(date.getDate() + dayOffset);
+      date.setHours(0, 0, 0, 0);
+
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const dateStr = `${year}-${month}-${day}`;
+
+      const tasksForDay = getTasksForDay(date);
+      tasksForDay.forEach(task => {
+        const key = `${task.id}_${dateStr}`;
+        const existing = taskAssignments[key];
+        const pts = calculateTaskPoints(task);
+        totalAllTasksPoints += pts;
+
+        if (existing && existing.userIds.length > 0) {
+          for (const uid of existing.userIds) {
+            registeredPointsByUser.set(uid, (registeredPointsByUser.get(uid) || 0) + pts);
+          }
+        }
+      });
+    }
+
+    // Jours restants (aujourd'hui → dimanche) : tâches non assignées + points inscrits
     for (let dayOffset = startOffset; dayOffset <= endOffset; dayOffset++) {
       const date = new Date();
       date.setDate(date.getDate() + dayOffset);
