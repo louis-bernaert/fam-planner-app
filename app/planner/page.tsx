@@ -2739,8 +2739,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
     const normalizedCosts = calculateNormalizedCosts();
 
-    // Calculer le total des points pour la semaine (toutes les tâches non assignées)
+    // Calculer le total des points pour la semaine
     let totalWeeklyPoints = 0;
+    let totalAllTasksPoints = 0;
+    const registeredPointsByUser = new Map<string, number>();
     const allUnassignedTasks: { task: Task; date: Date; dateStr: string; key: string; timeSlot: string }[] = [];
 
     // Plage lundi-dimanche : si dimanche, commence demain (lundi) jusqu'au dimanche suivant
@@ -2764,9 +2766,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         const key = `${task.id}_${dateStr}`;
         const existing = taskAssignments[key];
         const isUnassigned = !existing || existing.userIds.length === 0;
+        const pts = calculateTaskPoints(task);
+        totalAllTasksPoints += pts;
 
         if (isUnassigned) {
-          totalWeeklyPoints += calculateTaskPoints(task);
+          totalWeeklyPoints += pts;
           allUnassignedTasks.push({
             task,
             date,
@@ -2774,6 +2778,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             key,
             timeSlot: getTaskTimeSlot(task, date)
           });
+        } else if (existing) {
+          // Comptabiliser les points déjà inscrits par utilisateur
+          for (const uid of existing.userIds) {
+            registeredPointsByUser.set(uid, (registeredPointsByUser.get(uid) || 0) + pts);
+          }
         }
       });
     }
@@ -2796,7 +2805,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     });
     const getTargetForUser = (userId: string): number => {
       const weight = presenceWeights.get(userId) || 1;
-      return totalWeeklyPoints * (weight / totalWeight);
+      const fairShare = totalAllTasksPoints * (weight / totalWeight);
+      const alreadyRegistered = registeredPointsByUser.get(userId) || 0;
+      return Math.max(0, fairShare - alreadyRegistered);
     };
 
     // Historique de rotation (4 dernières semaines)
