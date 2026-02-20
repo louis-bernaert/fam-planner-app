@@ -2960,9 +2960,18 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       }
 
       const details: string[] = [];
-      userSummaries.forEach(summary => {
-        if (summary.tasks.length > 0) {
-          details.push(`── ${summary.name} — ${Math.round(summary.points)} pts ──`);
+      userSummaries.forEach((summary, userId) => {
+        if (summary.tasks.length > 0 || (registeredPointsByUser.get(userId) || 0) > 0) {
+          const weight = presenceWeights.get(userId) || 1;
+          const fairShare = Math.round(totalAllTasksPoints * (weight / totalWeight));
+          const alreadyRegistered = Math.round(registeredPointsByUser.get(userId) || 0);
+          const target = Math.max(0, fairShare - alreadyRegistered);
+          details.push(`── ${summary.name} — ${Math.round(summary.points)} pts attribués ──`);
+          details.push(`  Part équitable : ${fairShare} pts (sur ${Math.round(totalAllTasksPoints)} pts total semaine)`);
+          if (alreadyRegistered > 0) {
+            details.push(`  Déjà inscrit : -${alreadyRegistered} pts`);
+          }
+          details.push(`  Cible auto-attribution : ${Math.round(target)} pts`);
           summary.tasks.forEach(t => {
             details.push(`  • ${t.title} (${t.day}, ${Math.round(t.points)} pts)`);
             details.push(`    ${t.reason}`);
