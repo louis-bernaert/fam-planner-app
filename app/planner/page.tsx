@@ -4295,12 +4295,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           key={idx} 
                           className={`${styles.calendarDay} ${!day.isCurrentMonth ? styles.otherMonth : ""} ${isToday ? styles.today : ""}`}
                         >
-                          <div className={styles.dayNumber}>
-                            {day.date.getDate()}
-                            <button className={styles.dayAddBtn} onClick={(e) => { e.stopPropagation(); openCreateEventForm(day.date); }} title="Ajouter un événement">
-                              <Icon name="plus" size={10} />
-                            </button>
-                          </div>
+                          <div className={styles.dayNumber}>{day.date.getDate()}</div>
                           <div className={styles.dayEvents}>
                             {dayEvents.slice(0, 3).map((event, eventIdx) => (
                               <div 
