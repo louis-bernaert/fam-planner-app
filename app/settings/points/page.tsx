@@ -8,6 +8,7 @@ import Icon from "../../components/Icon";
 interface Family {
   id: string;
   name: string;
+  pointDebtEnabled: boolean;
   members: {
     id: string;
     userId: string;
@@ -134,6 +135,36 @@ export default function PointsSettingsPage() {
       }
     } catch (error) {
       console.error("Failed to update auto-assign participation", error);
+      showToast("error", "Erreur lors de la mise à jour");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const togglePointDebt = async () => {
+    if (!currentFamily) return;
+    setSaving(true);
+    try {
+      const newValue = !currentFamily.pointDebtEnabled;
+      const res = await fetch("/api/families", {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          id: currentFamily.id,
+          pointDebtEnabled: newValue,
+        }),
+      });
+
+      if (res.ok) {
+        setFamilies(prev => prev.map(f =>
+          f.id === currentFamily.id ? { ...f, pointDebtEnabled: newValue } : f
+        ));
+        showToast("success", newValue ? "Dette de points activée" : "Dette de points désactivée");
+      } else {
+        showToast("error", "Erreur lors de la mise à jour");
+      }
+    } catch (error) {
+      console.error("Failed to toggle point debt", error);
       showToast("error", "Erreur lors de la mise à jour");
     } finally {
       setSaving(false);
@@ -323,6 +354,36 @@ export default function PointsSettingsPage() {
                 </label>
               </div>
             ))}
+          </div>
+        </section>
+
+        {/* Point debt section */}
+        <section className={styles.section}>
+          <div className={styles.sectionHeader}>
+            <div className={`${styles.sectionIconWrapper} ${styles.sectionIconPrimary}`}>
+              <Icon name="chartBar" size={22} />
+            </div>
+            <div className={styles.sectionInfo}>
+              <h2>Dette de points</h2>
+              <p>Compense les déséquilibres des semaines précédentes lors de l&apos;auto-attribution</p>
+            </div>
+          </div>
+
+          <div className={styles.memberList}>
+            <div className={styles.memberItem}>
+              <span className={styles.memberName}>
+                {currentFamily?.pointDebtEnabled ? "Activée — les semaines passées influencent l'attribution" : "Désactivée — chaque semaine repart à zéro"}
+              </span>
+              <label className={styles.toggle}>
+                <input
+                  type="checkbox"
+                  checked={currentFamily?.pointDebtEnabled ?? true}
+                  onChange={togglePointDebt}
+                  disabled={saving}
+                />
+                <span className={styles.toggleTrack} />
+              </label>
+            </div>
           </div>
         </section>
 

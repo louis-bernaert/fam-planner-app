@@ -104,18 +104,29 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, name } = body;
+    const { id, name, pointDebtEnabled } = body;
 
-    if (!id || !name) {
+    if (!id) {
       return NextResponse.json(
-        { error: "id and name required" },
+        { error: "id required" },
+        { status: 400 }
+      );
+    }
+
+    const data: Record<string, any> = {};
+    if (name !== undefined) data.name = name;
+    if (pointDebtEnabled !== undefined) data.pointDebtEnabled = pointDebtEnabled;
+
+    if (Object.keys(data).length === 0) {
+      return NextResponse.json(
+        { error: "At least one field to update is required" },
         { status: 400 }
       );
     }
 
     const family = await prisma.family.update({
       where: { id },
-      data: { name },
+      data,
     });
 
     return NextResponse.json(family);
