@@ -30,6 +30,7 @@ type Family = {
   id: string;
   name: string;
   code: string;
+  pointDebtEnabled?: boolean;
 };
 
 type Task = {
@@ -206,6 +207,20 @@ export default function PlannerPage() {
   const [calendarMembers, setCalendarMembers] = useState<any[]>([]);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [showMemberSettings, setShowMemberSettings] = useState(false);
+  const [showEventForm, setShowEventForm] = useState(false);
+  const [editingEvent, setEditingEvent] = useState<any>(null);
+  const [localDbEvents, setLocalDbEvents] = useState<any[]>([]);
+  const [eventFormData, setEventFormData] = useState({
+    title: "",
+    date: "",
+    startTime: "09:00",
+    endTime: "10:00",
+    allDay: false,
+    description: "",
+    location: "",
+    recurrence: "none",
+    recurrenceEnd: "",
+  });
 
   // Planificateur state - affiche 2 jours à la fois
   const [plannerStartDate, setPlannerStartDate] = useState(() => {
@@ -349,23 +364,188 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   ];
 
   // Calendar functions
+
+  // Recurrence expansion for local events
+  const expandLocalEvents = (dbEvents: any[], rangeStart: Date, rangeEnd: Date, members: any[]) => {
+    const expanded: any[] = [];
+    for (const evt of dbEvents) {
+      const [y, m, d] = evt.date.split("-").map(Number);
+      const baseDate = new Date(y, m - 1, d);
+      const endRecur = evt.recurrenceEnd ? (() => { const [ey, em, ed] = evt.recurrenceEnd.split("-").map(Number); return new Date(ey, em - 1, ed); })() : null;
+      const member = members.find((mb: any) => mb.userId === evt.userId);
+      const color = member?.color || "#3b82f6";
+      const userName = evt.user?.name || "Inconnu";
+
+      if (evt.recurrence === "none") {
+        if (baseDate >= rangeStart && baseDate <= rangeEnd) {
+          expanded.push(toDisplayEvent(evt, evt.date, color, userName));
+        }
+      } else {
+        let current = new Date(baseDate);
+        const maxDate = endRecur && endRecur < rangeEnd ? endRecur : rangeEnd;
+        let safety = 0;
+        while (current <= maxDate && safety < 500) {
+          if (current >= rangeStart) {
+            const dateStr = `${current.getFullYear()}-${String(current.getMonth() + 1).padStart(2, "0")}-${String(current.getDate()).padStart(2, "0")}`;
+            expanded.push(toDisplayEvent(evt, dateStr, color, userName));
+          }
+          current = advanceDate(current, evt.recurrence);
+          safety++;
+        }
+      }
+    }
+    return expanded;
+  };
+
+  const advanceDate = (date: Date, recurrence: string): Date => {
+    const next = new Date(date);
+    switch (recurrence) {
+      case "daily": next.setDate(next.getDate() + 1); break;
+      case "weekly": next.setDate(next.getDate() + 7); break;
+      case "monthly": next.setMonth(next.getMonth() + 1); break;
+      case "yearly": next.setFullYear(next.getFullYear() + 1); break;
+    }
+    return next;
+  };
+
+  const toDisplayEvent = (evt: any, dateStr: string, color: string, userName: string) => {
+    const start = evt.allDay ? dateStr : `${dateStr}T${evt.startTime || "00:00"}:00`;
+    const end = evt.allDay ? dateStr : (evt.endTime ? `${dateStr}T${evt.endTime}:00` : start);
+    return {
+      id: `local-${evt.id}-${dateStr}`,
+      localEventId: evt.id,
+      title: evt.title,
+      start,
+      end,
+      allDay: evt.allDay,
+      description: evt.description || "",
+      location: evt.location || "",
+      color,
+      userName,
+      userId: evt.userId,
+      isLocal: true,
+      recurrence: evt.recurrence,
+      originalDate: evt.date,
+    };
+  };
+
+  // Event form handlers
+  const openCreateEventForm = (prefilledDate?: Date) => {
+    const d = prefilledDate || new Date();
+    const dateStr = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+    setEventFormData({
+      title: "",
+      date: dateStr,
+      startTime: "09:00",
+      endTime: "10:00",
+      allDay: false,
+      description: "",
+      location: "",
+      recurrence: "none",
+      recurrenceEnd: "",
+    });
+    setEditingEvent(null);
+    setShowEventForm(true);
+  };
+
+  const openEditEventForm = (event: any) => {
+    if (!event.isLocal) return;
+    setEventFormData({
+      title: event.title,
+      date: event.originalDate || event.start.substring(0, 10),
+      startTime: event.allDay ? "09:00" : (event.start.length > 10 ? event.start.substring(11, 16) : "09:00"),
+      endTime: event.allDay ? "10:00" : (event.end && event.end.length > 10 ? event.end.substring(11, 16) : "10:00"),
+      allDay: event.allDay,
+      description: event.description || "",
+      location: event.location || "",
+      recurrence: event.recurrence || "none",
+      recurrenceEnd: "",
+    });
+    setEditingEvent(event);
+    setShowEventForm(true);
+  };
+
+  const handleEventSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!currentUser || !selectedFamily) return;
+
+    const payload = {
+      ...eventFormData,
+      userId: currentUser,
+      familyId: selectedFamily,
+      ...(editingEvent ? { id: editingEvent.localEventId } : {}),
+    };
+
+    const method = editingEvent ? "PUT" : "POST";
+    try {
+      const res = await fetch("/api/calendar-events", {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      if (res.ok) {
+        setShowEventForm(false);
+        setEditingEvent(null);
+        loadCalendarData();
+      }
+    } catch (error) {
+      console.error("Failed to save event", error);
+    }
+  };
+
+  const handleEventDelete = async (eventId?: string) => {
+    const id = eventId || editingEvent?.localEventId;
+    if (!id || !currentUser) return;
+    try {
+      const res = await fetch(
+        `/api/calendar-events?id=${id}&userId=${currentUser}`,
+        { method: "DELETE" }
+      );
+      if (res.ok) {
+        setShowEventForm(false);
+        setEditingEvent(null);
+        setSelectedEvent(null);
+        loadCalendarData();
+      }
+    } catch (error) {
+      console.error("Failed to delete event", error);
+    }
+  };
+
   const loadCalendarData = async () => {
     if (!selectedFamily) return;
-    
+
     try {
       // Load members with calendar settings
       const membersRes = await fetch(`/api/calendar/members?familyId=${selectedFamily}`);
+      let membersData: any[] = [];
       if (membersRes.ok) {
-        const membersData = await membersRes.json();
+        membersData = await membersRes.json();
         setCalendarMembers(membersData);
       }
-      
-      // Load calendar events
+
+      // Load iCal events
       const eventsRes = await fetch(`/api/calendar?familyId=${selectedFamily}`);
+      let icalEvents: any[] = [];
       if (eventsRes.ok) {
-        const eventsData = await eventsRes.json();
-        setCalendarEvents(eventsData);
+        icalEvents = await eventsRes.json();
+        icalEvents = icalEvents.map((e: any) => ({ ...e, isLocal: false }));
       }
+
+      // Load local DB events
+      const localRes = await fetch(`/api/calendar-events?familyId=${selectedFamily}`);
+      let localExpandedEvents: any[] = [];
+      if (localRes.ok) {
+        const dbEvents = await localRes.json();
+        setLocalDbEvents(dbEvents);
+        const rangeStart = new Date(currentDate.getFullYear(), currentDate.getMonth() - 2, 1);
+        const rangeEnd = new Date(currentDate.getFullYear(), currentDate.getMonth() + 3, 0);
+        localExpandedEvents = expandLocalEvents(dbEvents, rangeStart, rangeEnd, membersData);
+      }
+
+      // Merge both sources
+      setCalendarEvents([...icalEvents, ...localExpandedEvents]);
     } catch (error) {
       console.error("Failed to load calendar data", error);
     }
@@ -618,12 +798,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         eventEndDate.setHours(0, 0, 0, 0);
         
         if ((checkDate >= eventStartDate && checkDate < eventEndDate) || checkDate.getTime() === eventStartDate.getTime()) {
-          unavailabilities.push({ time: 'Toute la journée', summary: event.summary || 'Événement' });
+          unavailabilities.push({ time: 'Toute la journée', summary: event.title || 'Événement' });
         }
       } else if (eventStart.toDateString() === date.toDateString()) {
         const startStr = eventStart.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
         const endStr = eventEnd.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        unavailabilities.push({ time: `${startStr} - ${endStr}`, summary: event.summary || 'Événement' });
+        unavailabilities.push({ time: `${startStr} - ${endStr}`, summary: event.title || 'Événement' });
       }
     }
     
@@ -1618,6 +1798,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   // IMPORTANT: On ne reporte PAS de dette si la personne n'a pas participé (0 points)
   // On reporte seulement les SURPLUS (si la personne a fait plus que son quota)
   const getLastWeekBalance = (userId: string): number => {
+    // Si la dette de points est désactivée pour cette famille, pas de report
+    const currentFamilyData = families.find(f => f.id === selectedFamily);
+    if (currentFamilyData && !currentFamilyData.pointDebtEnabled) return 0;
+
     const lastWeekStart = getWeekStart(new Date());
     lastWeekStart.setDate(lastWeekStart.getDate() - 7);
     
@@ -1784,7 +1968,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         const familiesRes = await fetch(`/api/families?userId=${currentUser}`);
         if (familiesRes.ok) {
           const familiesData = await familiesRes.json();
-          const mappedFamilies = familiesData.map((f: any) => ({ id: f.id, name: f.name, code: f.code || "" }));
+          const mappedFamilies = familiesData.map((f: any) => ({ id: f.id, name: f.name, code: f.code || "", pointDebtEnabled: f.pointDebtEnabled ?? true }));
           setFamilies(mappedFamilies);
           
           // Extract members from families and add to users
@@ -1937,12 +2121,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     loadData();
   }, [currentUser]);
 
-  // Load calendar data when family changes
+  // Load calendar data when family or month changes
   useEffect(() => {
     if (selectedFamily) {
       loadCalendarData();
     }
-  }, [selectedFamily]);
+  }, [selectedFamily, currentDate.getMonth(), currentDate.getFullYear()]);
 
   const familyUsers = useMemo(
     () => users.filter((u) => u.familyId === selectedFamily),
@@ -2987,6 +3171,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       balance: getLastWeekBalance(u.id),
     }));
 
+    const currentFamilyData = families.find(f => f.id === selectedFamily);
+    const pointDebtEnabled = currentFamilyData?.pointDebtEnabled ?? true;
+
     const solverResult = solveMILP(
       {
         tasks: solverTasks,
@@ -2997,7 +3184,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         params: {
           alpha: 4.0,
           beta: 0.4,
-          lambdaHistory: 0.25,
+          lambdaHistory: pointDebtEnabled ? 0.25 : 0,
           preferenceBonus: 0.7,
           preferenceThreshold: 0.2,
         },
@@ -3975,6 +4162,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             <div className={styles.calendarHeader}>
               <h3>Calendrier familial</h3>
               <div className={styles.calendarControls}>
+                <button onClick={() => openCreateEventForm()}>
+                  <Icon name="plus" size={14} style={{ marginRight: '6px' }} />Nouvel événement
+                </button>
                 <button onClick={() => setShowMemberSettings(!showMemberSettings)}>
                   {showMemberSettings ? "Voir calendrier" : <><Icon name="gear" size={14} style={{ marginRight: '6px' }} />Paramètres membres</>}
                 </button>
@@ -4105,7 +4295,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           key={idx} 
                           className={`${styles.calendarDay} ${!day.isCurrentMonth ? styles.otherMonth : ""} ${isToday ? styles.today : ""}`}
                         >
-                          <div className={styles.dayNumber}>{day.date.getDate()}</div>
+                          <div className={styles.dayNumber}>
+                            {day.date.getDate()}
+                            <button className={styles.dayAddBtn} onClick={(e) => { e.stopPropagation(); openCreateEventForm(day.date); }} title="Ajouter un événement">
+                              <Icon name="plus" size={10} />
+                            </button>
+                          </div>
                           <div className={styles.dayEvents}>
                             {dayEvents.slice(0, 3).map((event, eventIdx) => (
                               <div 
@@ -4181,9 +4376,20 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         {selectedEvent.description && (
                           <p><strong>Description :</strong> {selectedEvent.description}</p>
                         )}
-                        <p className={styles.unavailableNote} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <Icon name="warning" size={14} />{selectedEvent.userName} n'est pas disponible pendant cet événement
-                        </p>
+                        {selectedEvent.isLocal && selectedEvent.userId === currentUser ? (
+                          <div className={styles.eventModalActions}>
+                            <button onClick={() => { setSelectedEvent(null); openEditEventForm(selectedEvent); }}>
+                              <Icon name="pen" size={14} /> Modifier
+                            </button>
+                            <button className={styles.eventDeleteBtn} onClick={() => handleEventDelete(selectedEvent.localEventId)}>
+                              <Icon name="trash" size={14} /> Supprimer
+                            </button>
+                          </div>
+                        ) : (
+                          <p className={styles.unavailableNote} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <Icon name="warning" size={14} />{selectedEvent.userName} n&apos;est pas disponible pendant cet événement
+                          </p>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -5982,13 +6188,16 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             const member = calendarMembers.find(m => m.userId === event.userId);
                             const user = users.find(u => u.id === event.userId);
                             return (
-                              <div key={idx} className={styles.mobileDayEvent}>
-                                <div 
+                              <div key={idx} className={styles.mobileDayEvent}
+                                onClick={() => event.isLocal && event.userId === currentUser ? openEditEventForm(event) : setSelectedEvent(event)}
+                                style={{ cursor: 'pointer' }}
+                              >
+                                <div
                                   className={styles.mobileDayEventColor}
                                   style={{ backgroundColor: member?.color || `hsl(${(users.findIndex(u => u.id === event.userId) * 60) % 360}, 60%, 50%)` }}
                                 />
                                 <div className={styles.mobileDayEventInfo}>
-                                  <span className={styles.mobileDayEventTitle}>{event.summary}</span>
+                                  <span className={styles.mobileDayEventTitle}>{event.title}</span>
                                   <span className={styles.mobileDayEventTime}>
                                     {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
                                   </span>
@@ -6045,7 +6254,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                       className={styles.mobileWeekEvent}
                                       style={{ borderLeftColor: member?.color || 'var(--color-primary)' }}
                                     >
-                                      <span className={styles.mobileWeekEventTitle}>{event.summary}</span>
+                                      <span className={styles.mobileWeekEventTitle}>{event.title}</span>
                                     </div>
                                   );
                                 })}
@@ -6078,7 +6287,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                   style={{ backgroundColor: member?.color || `hsl(${(users.findIndex(u => u.id === event.userId) * 60) % 360}, 60%, 50%)` }}
                                 />
                                 <div className={styles.mobileDayEventInfo}>
-                                  <span className={styles.mobileDayEventTitle}>{event.summary}</span>
+                                  <span className={styles.mobileDayEventTitle}>{event.title}</span>
                                   <span className={styles.mobileDayEventTime}>
                                     {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
                                   </span>
@@ -6102,13 +6311,16 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           const member = calendarMembers.find(m => m.userId === event.userId);
                           const user = users.find(u => u.id === event.userId);
                           return (
-                            <div key={idx} className={styles.mobileDayEvent}>
-                              <div 
+                            <div key={idx} className={styles.mobileDayEvent}
+                              onClick={() => event.isLocal && event.userId === currentUser ? openEditEventForm(event) : setSelectedEvent(event)}
+                              style={{ cursor: 'pointer' }}
+                            >
+                              <div
                                 className={styles.mobileDayEventColor}
                                 style={{ backgroundColor: member?.color || `hsl(${(users.findIndex(u => u.id === event.userId) * 60) % 360}, 60%, 50%)` }}
                               />
                               <div className={styles.mobileDayEventInfo}>
-                                <span className={styles.mobileDayEventTitle}>{event.summary}</span>
+                                <span className={styles.mobileDayEventTitle}>{event.title}</span>
                                 <span className={styles.mobileDayEventTime}>
                                   {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
                                 </span>
@@ -6332,6 +6544,129 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               >
                 Envoyer
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Event form modal */}
+      {showEventForm && (
+        <div className={styles.eventModal} onClick={() => { setShowEventForm(false); setEditingEvent(null); }}>
+          <div className={styles.eventModalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <button className={styles.closeModal} onClick={() => { setShowEventForm(false); setEditingEvent(null); }}>×</button>
+            <div className={styles.eventModalHeader} style={{ backgroundColor: 'var(--color-primary)' }}>
+              <h4>{editingEvent ? "Modifier l'événement" : "Nouvel événement"}</h4>
+            </div>
+            <div className={styles.eventModalBody}>
+              <form onSubmit={handleEventSubmit} className={styles.eventForm}>
+                <label className={styles.eventFormLabel}>Titre *</label>
+                <input
+                  type="text"
+                  className={styles.eventFormInput}
+                  value={eventFormData.title}
+                  onChange={(e) => setEventFormData({ ...eventFormData, title: e.target.value })}
+                  required
+                  placeholder="Titre de l'événement"
+                />
+
+                <label className={styles.eventFormLabel}>Date *</label>
+                <input
+                  type="date"
+                  className={styles.eventFormInput}
+                  value={eventFormData.date}
+                  onChange={(e) => setEventFormData({ ...eventFormData, date: e.target.value })}
+                  required
+                />
+
+                <label className={styles.eventFormCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={eventFormData.allDay}
+                    onChange={(e) => setEventFormData({ ...eventFormData, allDay: e.target.checked })}
+                  />
+                  Toute la journée
+                </label>
+
+                {!eventFormData.allDay && (
+                  <div className={styles.eventFormRow}>
+                    <div className={styles.eventFormField}>
+                      <label className={styles.eventFormLabel}>Début</label>
+                      <input
+                        type="time"
+                        className={styles.eventFormInput}
+                        value={eventFormData.startTime}
+                        onChange={(e) => setEventFormData({ ...eventFormData, startTime: e.target.value })}
+                      />
+                    </div>
+                    <div className={styles.eventFormField}>
+                      <label className={styles.eventFormLabel}>Fin</label>
+                      <input
+                        type="time"
+                        className={styles.eventFormInput}
+                        value={eventFormData.endTime}
+                        onChange={(e) => setEventFormData({ ...eventFormData, endTime: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <label className={styles.eventFormLabel}>Description</label>
+                <textarea
+                  className={styles.eventFormTextarea}
+                  value={eventFormData.description}
+                  onChange={(e) => setEventFormData({ ...eventFormData, description: e.target.value })}
+                  placeholder="Description (optionnel)"
+                  rows={3}
+                />
+
+                <label className={styles.eventFormLabel}>Lieu</label>
+                <input
+                  type="text"
+                  className={styles.eventFormInput}
+                  value={eventFormData.location}
+                  onChange={(e) => setEventFormData({ ...eventFormData, location: e.target.value })}
+                  placeholder="Lieu (optionnel)"
+                />
+
+                <label className={styles.eventFormLabel}>Récurrence</label>
+                <select
+                  className={styles.eventFormSelect}
+                  value={eventFormData.recurrence}
+                  onChange={(e) => setEventFormData({ ...eventFormData, recurrence: e.target.value })}
+                >
+                  <option value="none">Aucune</option>
+                  <option value="daily">Quotidienne</option>
+                  <option value="weekly">Hebdomadaire</option>
+                  <option value="monthly">Mensuelle</option>
+                  <option value="yearly">Annuelle</option>
+                </select>
+
+                {eventFormData.recurrence !== "none" && (
+                  <>
+                    <label className={styles.eventFormLabel}>Fin de récurrence (optionnel)</label>
+                    <input
+                      type="date"
+                      className={styles.eventFormInput}
+                      value={eventFormData.recurrenceEnd}
+                      onChange={(e) => setEventFormData({ ...eventFormData, recurrenceEnd: e.target.value })}
+                    />
+                  </>
+                )}
+
+                <div className={styles.eventFormActions}>
+                  <button type="button" className={styles.eventFormCancel} onClick={() => { setShowEventForm(false); setEditingEvent(null); }}>
+                    Annuler
+                  </button>
+                  {editingEvent && (
+                    <button type="button" className={styles.eventFormDelete} onClick={() => handleEventDelete()}>
+                      <Icon name="trash" size={14} /> Supprimer
+                    </button>
+                  )}
+                  <button type="submit" className={styles.eventFormSubmit}>
+                    <Icon name="check" size={14} /> {editingEvent ? "Modifier" : "Créer"}
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
@@ -6598,6 +6933,129 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               ))}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Event form modal */}
+      {showEventForm && (
+        <div className={styles.eventModal} onClick={() => { setShowEventForm(false); setEditingEvent(null); }}>
+          <div className={styles.eventModalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
+            <button className={styles.closeModal} onClick={() => { setShowEventForm(false); setEditingEvent(null); }}>×</button>
+            <div className={styles.eventModalHeader} style={{ backgroundColor: 'var(--color-primary)' }}>
+              <h4>{editingEvent ? "Modifier l'événement" : "Nouvel événement"}</h4>
+            </div>
+            <div className={styles.eventModalBody}>
+              <form onSubmit={handleEventSubmit} className={styles.eventForm}>
+                <label className={styles.eventFormLabel}>Titre *</label>
+                <input
+                  type="text"
+                  className={styles.eventFormInput}
+                  value={eventFormData.title}
+                  onChange={(e) => setEventFormData({ ...eventFormData, title: e.target.value })}
+                  required
+                  placeholder="Titre de l'événement"
+                />
+
+                <label className={styles.eventFormLabel}>Date *</label>
+                <input
+                  type="date"
+                  className={styles.eventFormInput}
+                  value={eventFormData.date}
+                  onChange={(e) => setEventFormData({ ...eventFormData, date: e.target.value })}
+                  required
+                />
+
+                <label className={styles.eventFormCheckbox}>
+                  <input
+                    type="checkbox"
+                    checked={eventFormData.allDay}
+                    onChange={(e) => setEventFormData({ ...eventFormData, allDay: e.target.checked })}
+                  />
+                  Toute la journée
+                </label>
+
+                {!eventFormData.allDay && (
+                  <div className={styles.eventFormRow}>
+                    <div className={styles.eventFormField}>
+                      <label className={styles.eventFormLabel}>Début</label>
+                      <input
+                        type="time"
+                        className={styles.eventFormInput}
+                        value={eventFormData.startTime}
+                        onChange={(e) => setEventFormData({ ...eventFormData, startTime: e.target.value })}
+                      />
+                    </div>
+                    <div className={styles.eventFormField}>
+                      <label className={styles.eventFormLabel}>Fin</label>
+                      <input
+                        type="time"
+                        className={styles.eventFormInput}
+                        value={eventFormData.endTime}
+                        onChange={(e) => setEventFormData({ ...eventFormData, endTime: e.target.value })}
+                      />
+                    </div>
+                  </div>
+                )}
+
+                <label className={styles.eventFormLabel}>Description</label>
+                <textarea
+                  className={styles.eventFormTextarea}
+                  value={eventFormData.description}
+                  onChange={(e) => setEventFormData({ ...eventFormData, description: e.target.value })}
+                  placeholder="Description (optionnel)"
+                  rows={3}
+                />
+
+                <label className={styles.eventFormLabel}>Lieu</label>
+                <input
+                  type="text"
+                  className={styles.eventFormInput}
+                  value={eventFormData.location}
+                  onChange={(e) => setEventFormData({ ...eventFormData, location: e.target.value })}
+                  placeholder="Lieu (optionnel)"
+                />
+
+                <label className={styles.eventFormLabel}>Récurrence</label>
+                <select
+                  className={styles.eventFormSelect}
+                  value={eventFormData.recurrence}
+                  onChange={(e) => setEventFormData({ ...eventFormData, recurrence: e.target.value })}
+                >
+                  <option value="none">Aucune</option>
+                  <option value="daily">Quotidienne</option>
+                  <option value="weekly">Hebdomadaire</option>
+                  <option value="monthly">Mensuelle</option>
+                  <option value="yearly">Annuelle</option>
+                </select>
+
+                {eventFormData.recurrence !== "none" && (
+                  <>
+                    <label className={styles.eventFormLabel}>Fin de récurrence (optionnel)</label>
+                    <input
+                      type="date"
+                      className={styles.eventFormInput}
+                      value={eventFormData.recurrenceEnd}
+                      onChange={(e) => setEventFormData({ ...eventFormData, recurrenceEnd: e.target.value })}
+                    />
+                  </>
+                )}
+
+                <div className={styles.eventFormActions}>
+                  <button type="button" className={styles.eventFormCancel} onClick={() => { setShowEventForm(false); setEditingEvent(null); }}>
+                    Annuler
+                  </button>
+                  {editingEvent && (
+                    <button type="button" className={styles.eventFormDelete} onClick={() => handleEventDelete()}>
+                      <Icon name="trash" size={14} /> Supprimer
+                    </button>
+                  )}
+                  <button type="submit" className={styles.eventFormSubmit}>
+                    <Icon name="check" size={14} /> {editingEvent ? "Modifier" : "Créer"}
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
         </div>
       )}
     </main>

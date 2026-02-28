@@ -24,18 +24,21 @@ model User {
   validations     TaskValidation[]
   evaluations     TaskEvaluation[]
   suggestions     Suggestion[]
+  calendarEvents  CalendarEvent[]
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @updatedAt
 }
 
 model Family {
-  id           String         @id @default(cuid())
-  name         String
-  code         String?        @unique @default(cuid())
-  createdAt    DateTime       @default(now())
-  members      Membership[]
-  tasks        Task[]
-  suggestions  Suggestion[]
+  id               String         @id @default(cuid())
+  name             String
+  code             String?        @unique @default(cuid())
+  pointDebtEnabled Boolean        @default(true)
+  createdAt        DateTime       @default(now())
+  members          Membership[]
+  tasks            Task[]
+  suggestions      Suggestion[]
+  calendarEvents   CalendarEvent[]
 }
 
 model Membership {
@@ -136,4 +139,26 @@ model Suggestion {
   createdAt DateTime @default(now())
   user      User     @relation(fields: [userId], references: [id])
   family    Family   @relation(fields: [familyId], references: [id])
+}
+
+model CalendarEvent {
+  id              String    @id @default(cuid())
+  title           String
+  date            String    // Format YYYY-MM-DD
+  startTime       String?   // Format HH:MM (null si allDay)
+  endTime         String?   // Format HH:MM (null si allDay)
+  allDay          Boolean   @default(false)
+  description     String?
+  location        String?
+  recurrence      String    @default("none") // none|daily|weekly|monthly|yearly
+  recurrenceEnd   String?   // Format YYYY-MM-DD
+  userId          String
+  familyId        String
+  user            User      @relation(fields: [userId], references: [id])
+  family          Family    @relation(fields: [familyId], references: [id])
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  @@index([userId, familyId])
+  @@index([familyId])
 }
