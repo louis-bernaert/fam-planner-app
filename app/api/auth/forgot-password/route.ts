@@ -49,15 +49,24 @@ export async function POST(request: Request) {
       from: `"Fam'Planner" <${process.env.GMAIL_USER}>`,
       to: user.email,
       subject: "Fam'Planner - Réinitialisation de mot de passe",
+      text: `Bonjour ${user.name},\n\nVous avez demandé la réinitialisation de votre mot de passe Fam'Planner.\n\nCliquez sur ce lien (valide 1 heure) :\n${resetUrl}\n\nSi vous n'avez pas fait cette demande, ignorez cet email.`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
           <h2 style="color: #18181b; margin-bottom: 16px;">Réinitialisation de mot de passe</h2>
           <p style="color: #52525b; line-height: 1.6;">Bonjour ${user.name},</p>
           <p style="color: #52525b; line-height: 1.6;">Vous avez demandé la réinitialisation de votre mot de passe Fam'Planner.</p>
           <p style="color: #52525b; line-height: 1.6;">Cliquez sur le bouton ci-dessous (valide 1 heure) :</p>
-          <a href="${resetUrl}" style="display: inline-block; background: #18181b; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 500; margin: 16px 0;">
-            Réinitialiser mon mot de passe
-          </a>
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin: 16px 0;">
+            <tr>
+              <td style="background: #18181b; border-radius: 10px;">
+                <a href="${resetUrl}" target="_blank" style="display: inline-block; padding: 12px 24px; color: #ffffff; text-decoration: none; font-weight: 500; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                  Réinitialiser mon mot de passe
+                </a>
+              </td>
+            </tr>
+          </table>
+          <p style="color: #71717a; font-size: 13px; line-height: 1.5;">Si le bouton ne fonctionne pas, copiez-collez ce lien dans votre navigateur :</p>
+          <p style="color: #3b82f6; font-size: 13px; word-break: break-all;"><a href="${resetUrl}" style="color: #3b82f6;">${resetUrl}</a></p>
           <p style="color: #a1a1aa; font-size: 13px; margin-top: 24px;">Si vous n'avez pas fait cette demande, ignorez simplement cet email.</p>
         </div>
       `,
