@@ -49,6 +49,7 @@ export async function POST(request: Request) {
       from: `"Fam'Planner" <${process.env.GMAIL_USER}>`,
       to: user.email,
       subject: "Fam'Planner - Réinitialisation de mot de passe",
+      text: `Bonjour ${user.name},\n\nVous avez demandé la réinitialisation de votre mot de passe Fam'Planner.\n\nCliquez sur le lien ci-dessous (valide 1 heure) :\n${resetUrl}\n\nSi vous n'avez pas fait cette demande, ignorez simplement cet email.`,
       html: `
         <div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; padding: 32px;">
           <h2 style="color: #18181b; margin-bottom: 16px;">Réinitialisation de mot de passe</h2>
