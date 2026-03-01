@@ -19,6 +19,14 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
     }
 
+    // Google-only accounts cannot login with password
+    if (!user.passwordHash) {
+      return NextResponse.json(
+        { error: "Ce compte utilise Google. Connectez-vous avec Google." },
+        { status: 401 }
+      );
+    }
+
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
       return NextResponse.json({ error: "Mot de passe invalide" }, { status: 401 });

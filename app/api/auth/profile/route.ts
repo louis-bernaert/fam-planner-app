@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import bcrypt from "bcryptjs";
 
 export async function PUT(request: Request) {
   try {
@@ -15,7 +16,7 @@ export async function PUT(request: Request) {
     const updateData: any = {};
     if (name) updateData.name = name;
     if (email) updateData.email = email;
-    if (password) updateData.passwordHash = password; // Note: should be hashed in production
+    if (password) updateData.passwordHash = await bcrypt.hash(password, 10);
 
     const updatedUser = await prisma.user.update({
       where: { id },

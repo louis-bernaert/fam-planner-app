@@ -178,11 +178,15 @@ export default function PlannerPage() {
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [currentUser, setCurrentUser] = useState<string | null>(null);
   const [newAccount, setNewAccount] = useState({ name: "", email: "", password: "", familyId: "" });
-  const [authView, setAuthView] = useState<"login" | "signup">("login");
+  const [authView, setAuthView] = useState<"login" | "signup" | "forgot">("login");
   const [authEmail, setAuthEmail] = useState("");
   const [authPassword, setAuthPassword] = useState("");
   const [authError, setAuthError] = useState("");
   const [authMessage, setAuthMessage] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
+  const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [forgotEmail, setForgotEmail] = useState("");
+  const [forgotLoading, setForgotLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"monespace" | "taches" | "dispos" | "planificateur" | "points">("monespace");
   const [paramMessage, setParamMessage] = useState<string>("");
   const [addUserMessage, setAddUserMessage] = useState<string>("");
@@ -1954,6 +1958,37 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     const authParam = searchParams?.get("auth");
     if (authParam === "signup") setAuthView("signup");
     if (authParam === "login") setAuthView("login");
+
+    // Handle Google OAuth callback
+    const googleAuth = searchParams?.get("googleAuth");
+    if (googleAuth) {
+      try {
+        const user = JSON.parse(decodeURIComponent(googleAuth));
+        mergeAuthUser(user);
+        setCurrentUser(user.id);
+        setSelectedUser(user.id);
+        setSelectedFamily(user.familyIds?.[0] ?? selectedFamily);
+        setAuthError("");
+        setAuthMessage(`Connecté avec Google en tant que ${user.name}.`);
+        window.localStorage.setItem("sessionUser", JSON.stringify(user));
+        window.history.replaceState({}, "", "/planner");
+      } catch (e) {
+        console.error("google auth parse", e);
+        setAuthError("Erreur de connexion Google");
+      }
+    }
+
+    // Handle Google OAuth errors
+    const errorParam = searchParams?.get("error");
+    if (errorParam?.startsWith("google_")) {
+      const messages: Record<string, string> = {
+        google_denied: "Connexion Google annulée",
+        google_token: "Erreur d'authentification Google",
+        google_email: "Impossible de récupérer l'email Google",
+        google_server: "Erreur serveur lors de la connexion Google",
+      };
+      setAuthError(messages[errorParam] || "Erreur de connexion Google");
+    }
   }, [searchParams]);
 
   // Load families and tasks from database when user logs in
@@ -2466,6 +2501,34 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     setAuthError("");
     window.localStorage.removeItem("sessionUser");
     router.replace("/");
+  }
+
+  async function forgotPassword() {
+    if (!forgotEmail.trim()) {
+      setAuthError("Veuillez entrer votre adresse email");
+      return;
+    }
+    setForgotLoading(true);
+    setAuthError("");
+    setAuthMessage("");
+    try {
+      const res = await fetch("/api/auth/forgot-password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email: forgotEmail.trim().toLowerCase() }),
+      });
+      const data = await res.json();
+      if (!res.ok) {
+        setAuthError(data?.error || "Erreur lors de l'envoi");
+      } else {
+        setAuthMessage("Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.");
+        setForgotEmail("");
+      }
+    } catch {
+      setAuthError("Erreur réseau");
+    } finally {
+      setForgotLoading(false);
+    }
   }
 
   function joinFamily(userId: string, familyId: string) {
@@ -3382,75 +3445,215 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     return (
       <main className={styles.authShell}>
         <div className={styles.authCard}>
-          <div className={styles.authTabs}>
-            <button
-              className={authView === "login" ? styles.tabActive : styles.tab}
-              onClick={() => {
-                setAuthView("login");
-                setAuthMessage("");
-                setAuthError("");
-              }}
-            >
-              Connexion
-            </button>
-            <button
-              className={authView === "signup" ? styles.tabActive : styles.tab}
-              onClick={() => {
-                setAuthView("signup");
-                setAuthMessage("");
-                setAuthError("");
-              }}
-            >
-              Inscription
-            </button>
+          {/* Branding */}
+          <div className={styles.authBranding}>
+            <Image
+              src="/logo/logo_sans_nom_couleur.png"
+              alt="Fam'Planner"
+              width={56}
+              height={56}
+            />
+            <h1 className={styles.authTitle}>Fam&apos;Planner</h1>
+            <p className={styles.authSubtitle}>
+              Organisez votre foyer en toute sérénité
+            </p>
           </div>
 
+          {/* Google OAuth (hidden on forgot view) */}
+          {authView !== "forgot" && (
+            <>
+              <button
+                className={styles.googleBtn}
+                onClick={() => { window.location.href = "/api/auth/google"; }}
+              >
+                <svg viewBox="0 0 24 24" width="18" height="18" style={{ flexShrink: 0 }}>
+                  <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92a5.06 5.06 0 0 1-2.2 3.32v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.1z"/>
+                  <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
+                  <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
+                  <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
+                </svg>
+                Continuer avec Google
+              </button>
+
+              <div className={styles.authDivider}>
+                <span>ou</span>
+              </div>
+            </>
+          )}
+
+          {/* Tabs (hidden on forgot view) */}
+          {authView !== "forgot" && (
+            <div className={styles.authTabs}>
+              <button
+                className={authView === "login" ? styles.tabActive : styles.tab}
+                onClick={() => {
+                  setAuthView("login");
+                  setAuthMessage("");
+                  setAuthError("");
+                }}
+              >
+                Connexion
+              </button>
+              <button
+                className={authView === "signup" ? styles.tabActive : styles.tab}
+                onClick={() => {
+                  setAuthView("signup");
+                  setAuthMessage("");
+                  setAuthError("");
+                }}
+              >
+                Inscription
+              </button>
+            </div>
+          )}
+
+          {/* Forgot password header */}
+          {authView === "forgot" && (
+            <h2 className={styles.authSectionTitle}>Réinitialisation du mot de passe</h2>
+          )}
+
+          {/* Login form */}
           {authView === "login" && (
-            <div className={styles.formGridSmall}>
-              <label className={styles.label}>Email</label>
-              <input
-                value={authEmail}
-                onChange={(e) => setAuthEmail(e.target.value)}
-                placeholder="vous@exemple.com"
-              />
-              <label className={styles.label}>Mot de passe</label>
-              <input
-                type="password"
-                value={authPassword}
-                onChange={(e) => setAuthPassword(e.target.value)}
-                placeholder="mot de passe"
-              />
-              <button onClick={() => login()}>Se connecter</button>
+            <div className={styles.authForm}>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Email</label>
+                <input
+                  value={authEmail}
+                  onChange={(e) => setAuthEmail(e.target.value)}
+                  placeholder="vous@exemple.com"
+                  type="email"
+                />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Mot de passe</label>
+                <div className={styles.passwordField}>
+                  <input
+                    type={showPassword ? "text" : "password"}
+                    value={authPassword}
+                    onChange={(e) => setAuthPassword(e.target.value)}
+                    placeholder="mot de passe"
+                  />
+                  <button
+                    type="button"
+                    className={styles.passwordToggle}
+                    onClick={() => setShowPassword(!showPassword)}
+                    tabIndex={-1}
+                  >
+                    <Icon name={showPassword ? "eyeSlash" : "eye"} size={16} />
+                  </button>
+                </div>
+              </div>
+              <button className={styles.authSubmitBtn} onClick={() => login()}>
+                Se connecter
+              </button>
+              <button
+                type="button"
+                className={styles.forgotLink}
+                onClick={() => {
+                  setAuthView("forgot");
+                  setAuthError("");
+                  setAuthMessage("");
+                }}
+              >
+                Mot de passe oublié ?
+              </button>
             </div>
           )}
 
+          {/* Signup form */}
           {authView === "signup" && (
-            <div className={styles.formGridSmall}>
-              <label className={styles.label}>Nom</label>
-              <input
-                value={newAccount.name}
-                onChange={(e) => setNewAccount((a) => ({ ...a, name: e.target.value }))}
-                placeholder="Votre nom"
-              />
-              <label className={styles.label}>Email</label>
-              <input
-                value={newAccount.email}
-                onChange={(e) => setNewAccount((a) => ({ ...a, email: e.target.value }))}
-                placeholder="vous@exemple.com"
-              />
-              <label className={styles.label}>Mot de passe</label>
-              <input
-                type="password"
-                value={newAccount.password}
-                onChange={(e) => setNewAccount((a) => ({ ...a, password: e.target.value }))}
-                placeholder="mot de passe"
-              />
-              <button onClick={createAccount}>Créer et entrer</button>
+            <div className={styles.authForm}>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Nom</label>
+                <input
+                  value={newAccount.name}
+                  onChange={(e) => setNewAccount((a) => ({ ...a, name: e.target.value }))}
+                  placeholder="Votre nom"
+                />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Email</label>
+                <input
+                  value={newAccount.email}
+                  onChange={(e) => setNewAccount((a) => ({ ...a, email: e.target.value }))}
+                  placeholder="vous@exemple.com"
+                  type="email"
+                />
+              </div>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Mot de passe</label>
+                <div className={styles.passwordField}>
+                  <input
+                    type={showSignupPassword ? "text" : "password"}
+                    value={newAccount.password}
+                    onChange={(e) => setNewAccount((a) => ({ ...a, password: e.target.value }))}
+                    placeholder="mot de passe"
+                  />
+                  <button
+                    type="button"
+                    className={styles.passwordToggle}
+                    onClick={() => setShowSignupPassword(!showSignupPassword)}
+                    tabIndex={-1}
+                  >
+                    <Icon name={showSignupPassword ? "eyeSlash" : "eye"} size={16} />
+                  </button>
+                </div>
+              </div>
+              <button className={styles.authSubmitBtn} onClick={createAccount}>
+                Créer mon compte
+              </button>
             </div>
           )}
 
-          {authError && <p className={styles.error}>{authError}</p>}
-          {authMessage && <p className={styles.success}>{authMessage}</p>}
+          {/* Forgot password form */}
+          {authView === "forgot" && (
+            <div className={styles.authForm}>
+              <p className={styles.forgotDescription}>
+                Entrez votre adresse email. Si un compte existe, vous recevrez un lien de réinitialisation.
+              </p>
+              <div className={styles.inputGroup}>
+                <label className={styles.label}>Email</label>
+                <input
+                  value={forgotEmail}
+                  onChange={(e) => setForgotEmail(e.target.value)}
+                  placeholder="vous@exemple.com"
+                  type="email"
+                />
+              </div>
+              <button
+                className={styles.authSubmitBtn}
+                onClick={forgotPassword}
+                disabled={forgotLoading}
+              >
+                {forgotLoading ? "Envoi..." : "Envoyer le lien"}
+              </button>
+              <button
+                type="button"
+                className={styles.backLink}
+                onClick={() => {
+                  setAuthView("login");
+                  setAuthError("");
+                  setAuthMessage("");
+                }}
+              >
+                <Icon name="arrowLeft" size={14} /> Retour à la connexion
+              </button>
+            </div>
+          )}
+
+          {/* Error / Success messages */}
+          {authError && (
+            <div className={styles.authAlert} data-type="error">
+              <Icon name="alertTriangle" size={14} />
+              {authError}
+            </div>
+          )}
+          {authMessage && (
+            <div className={styles.authAlert} data-type="success">
+              <Icon name="circleCheck" size={14} />
+              {authMessage}
+            </div>
+          )}
         </div>
       </main>
     );

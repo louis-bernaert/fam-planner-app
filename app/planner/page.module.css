@@ -1751,19 +1751,82 @@
   align-items: center;
   justify-content: center;
   padding: var(--space-5);
-  background-color: var(--color-bg);
+  background-color: var(--color-bg-subtle);
 }
 
 .authCard {
   width: 100%;
-  max-width: 400px;
-  padding: var(--space-6);
+  max-width: 420px;
+  padding: var(--space-7);
   background-color: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-xl);
   box-shadow: var(--shadow-lg);
 }
 
+/* Branding */
+.authBranding {
+  text-align: center;
+  margin-bottom: var(--space-6);
+}
+
+.authTitle {
+  font-size: 1.5rem;
+  font-weight: 700;
+  margin-top: var(--space-3);
+  letter-spacing: -0.03em;
+}
+
+.authSubtitle {
+  font-size: 0.875rem;
+  color: var(--color-text-muted);
+  margin-top: var(--space-1);
+}
+
+/* Google button */
+.googleBtn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-3);
+  padding: 0.625rem 1rem;
+  background-color: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.9375rem;
+  font-weight: 500;
+  color: var(--color-text);
+  cursor: pointer;
+  transition:
+    background-color var(--transition-fast),
+    border-color var(--transition-fast);
+}
+
+.googleBtn:hover {
+  background-color: var(--color-surface-hover);
+  border-color: var(--color-border-strong);
+}
+
+/* Divider */
+.authDivider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+}
+
+.authDivider::before,
+.authDivider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background-color: var(--color-border);
+}
+
+/* Tabs */
 .authTabs {
   display: flex;
   gap: var(--space-2);
@@ -1784,7 +1847,7 @@
   background-color: transparent;
   color: var(--color-text-secondary);
   cursor: pointer;
-  transition: 
+  transition:
     background-color var(--transition-fast),
     color var(--transition-fast);
 }
@@ -1799,10 +1862,142 @@
   box-shadow: var(--shadow-xs);
 }
 
+/* Auth form */
 .authForm {
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
+}
+
+.inputGroup {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.inputGroup label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-text-secondary);
+}
+
+/* Password field with toggle */
+.passwordField {
+  position: relative;
+}
+
+.passwordField input {
+  padding-right: 2.75rem;
+}
+
+.passwordToggle {
+  position: absolute;
+  right: 0.5rem;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  padding: 0.375rem;
+  color: var(--color-text-muted);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  border-radius: var(--radius-sm);
+}
+
+.passwordToggle:hover {
+  color: var(--color-text);
+  background: transparent;
+}
+
+/* Submit button */
+.authSubmitBtn {
+  width: 100%;
+  padding: 0.625rem;
+  background-color: var(--color-accent);
+  color: var(--color-text-inverted, #fff);
+  font-weight: 500;
+  font-size: 0.9375rem;
+  border: none;
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: opacity var(--transition-fast);
+}
+
+.authSubmitBtn:hover {
+  opacity: 0.9;
+}
+
+.authSubmitBtn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Forgot password link */
+.forgotLink {
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  cursor: pointer;
+  text-align: center;
+  padding: 0;
+}
+
+.forgotLink:hover {
+  color: var(--color-primary);
+  background: none;
+}
+
+/* Back link */
+.backLink {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--space-2);
+  background: none;
+  border: none;
+  color: var(--color-text-muted);
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.backLink:hover {
+  color: var(--color-text);
+  background: none;
+}
+
+/* Alert messages */
+.authAlert {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
+  font-size: 0.8125rem;
+  border-radius: var(--radius-md);
+  margin-top: var(--space-4);
+}
+
+.authAlert[data-type="error"] {
+  background-color: var(--color-error-subtle);
+  color: var(--color-error);
+}
+
+.authAlert[data-type="success"] {
+  background-color: var(--color-success-subtle, #f0fdf4);
+  color: var(--color-success, #22c55e);
+}
+
+.authSectionTitle {
+  font-size: 1.125rem;
+  font-weight: 600;
+  margin-bottom: var(--space-4);
+}
+
+.forgotDescription {
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+  line-height: 1.5;
 }
 
 .authError {
