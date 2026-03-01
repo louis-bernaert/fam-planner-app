@@ -55,9 +55,15 @@ export async function POST(request: Request) {
           <p style="color: #52525b; line-height: 1.6;">Bonjour ${user.name},</p>
           <p style="color: #52525b; line-height: 1.6;">Vous avez demandé la réinitialisation de votre mot de passe Fam'Planner.</p>
           <p style="color: #52525b; line-height: 1.6;">Cliquez sur le bouton ci-dessous (valide 1 heure) :</p>
-          <a href="${resetUrl}" style="display: inline-block; background: #18181b; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 500; margin: 16px 0;">
-            Réinitialiser mon mot de passe
-          </a>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin: 16px 0;">
+            <tr>
+              <td align="center" style="background: #18181b; border-radius: 10px;">
+                <a href="${resetUrl}" target="_blank" style="display: block; padding: 14px 28px; color: #ffffff; text-decoration: none; font-weight: 500; font-size: 16px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;">
+                  Réinitialiser mon mot de passe
+                </a>
+              </td>
+            </tr>
+          </table>
           <p style="color: #a1a1aa; font-size: 13px; margin-top: 24px;">Si vous n'avez pas fait cette demande, ignorez simplement cet email.</p>
         </div>
       `,
