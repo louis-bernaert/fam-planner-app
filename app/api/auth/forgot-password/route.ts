@@ -60,11 +60,15 @@ export async function POST(request: Request) {
         'Si vous n\'avez pas fait cette demande, ignorez simplement cet email.',
       ].join('\n'),
       html: [
-        `<p>Bonjour ${user.name},</p>`,
-        '<p>Vous avez demandé la réinitialisation de votre mot de passe Fam\'Planner.</p>',
-        '<p>Cliquez sur le lien ci-dessous (valide 1 heure) :</p>',
-        `<p><a href="${resetUrl}">${resetUrl}</a></p>`,
-        '<p style="color:gray;font-size:small;">Si vous n\'avez pas fait cette demande, ignorez simplement cet email.</p>',
+        '<div style="font-family:-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif;max-width:480px;margin:0 auto;padding:32px;">',
+        '<h2 style="color:#18181b;margin-bottom:16px;">Réinitialisation de mot de passe</h2>',
+        `<p style="color:#52525b;line-height:1.6;">Bonjour ${user.name},</p>`,
+        '<p style="color:#52525b;line-height:1.6;">Vous avez demandé la réinitialisation de votre mot de passe Fam\'Planner.</p>',
+        '<p style="color:#52525b;line-height:1.6;">Cliquez sur le bouton ci-dessous (valide 1 heure) :</p>',
+        `<p style="margin:16px 0;"><a href="${resetUrl}" style="background-color:#18181b;border-radius:10px;color:#ffffff;display:inline-block;font-size:16px;font-weight:500;padding:14px 28px;text-decoration:none;">Réinitialiser mon mot de passe</a></p>`,
+        `<p style="color:#71717a;font-size:12px;word-break:break-all;">Si le bouton ne fonctionne pas, copiez ce lien : <a href="${resetUrl}" style="color:#3b82f6;">${resetUrl}</a></p>`,
+        '<p style="color:#a1a1aa;font-size:13px;margin-top:24px;">Si vous n\'avez pas fait cette demande, ignorez simplement cet email.</p>',
+        '</div>',
       ].join(''),
     });
 
