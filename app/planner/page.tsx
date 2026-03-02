@@ -7492,6 +7492,32 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           </div>
         </div>
       )}
+
+      {/* Dish Input Modal (Desktop) */}
+      {dishModal && (
+        <div className={styles.eventModal} onClick={() => setDishModal(null)}>
+          <div className={styles.dishModalContent} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.dishModalHeader}>
+              <h4>Quel plat cuisinez-vous ?</h4>
+            </div>
+            <div className={styles.dishModalBody}>
+              <input
+                type="text"
+                value={dishInput}
+                onChange={(e) => setDishInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') confirmDishAndClaim(); }}
+                placeholder="Ex: Pâtes carbonara"
+                className={styles.dishModalInput}
+                autoFocus
+              />
+              <div className={styles.dishModalActions}>
+                <button className={styles.dishModalCancel} onClick={() => setDishModal(null)}>Annuler</button>
+                <button className={styles.dishModalConfirm} onClick={confirmDishAndClaim}>Confirmer</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 }
