@@ -4,7 +4,7 @@ import { prisma } from "@/lib/prisma";
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { title, duration, penibility, slot, schedules, familyId } = body;
+    const { title, duration, penibility, slot, schedules, familyId, isCooking, isRecurring } = body;
 
     if (!title || !familyId) {
       return NextResponse.json(
@@ -32,6 +32,8 @@ export async function POST(req: NextRequest) {
         penibility: penibility || 30,
         slot: slot || "Lun · Matin",
         frequency: JSON.stringify(schedules || [slot || "Lun · Matin"]),
+        isCooking: isCooking || false,
+        isRecurring: isRecurring || false,
         familyId,
       },
     });
@@ -75,7 +77,7 @@ export async function GET(req: NextRequest) {
 export async function PUT(req: NextRequest) {
   try {
     const body = await req.json();
-    const { id, title, duration, penibility, slot, schedules } = body;
+    const { id, title, duration, penibility, slot, schedules, isCooking, isRecurring } = body;
 
     if (!id) {
       return NextResponse.json(
@@ -92,6 +94,8 @@ export async function PUT(req: NextRequest) {
         penibility: penibility !== undefined ? penibility : undefined,
         slot: slot !== undefined ? slot : undefined,
         frequency: schedules ? JSON.stringify(schedules) : undefined,
+        isCooking: isCooking !== undefined ? isCooking : undefined,
+        isRecurring: isRecurring !== undefined ? isRecurring : undefined,
       },
     });
 

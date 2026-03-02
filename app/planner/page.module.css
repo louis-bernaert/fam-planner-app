@@ -977,6 +977,30 @@
   opacity: 1;
 }
 
+.taskOptionToggles {
+  display: flex;
+  gap: 1rem;
+  padding-top: 0.5rem;
+  flex-wrap: wrap;
+}
+
+.taskOptionToggle {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--color-text-secondary, #71717a);
+  user-select: none;
+}
+
+.taskOptionToggle input[type="checkbox"] {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--color-accent, #18181b);
+  cursor: pointer;
+}
+
 .taskFormActions {
   display: flex;
   justify-content: flex-end;

@@ -65,6 +65,8 @@ model Task {
   penibility    Int
   slot          String
   frequency     String
+  isCooking     Boolean           @default(false)
+  isRecurring   Boolean           @default(false)
   familyId      String
   family        Family            @relation(fields: [familyId], references: [id])
   assignments   Assignment[]
@@ -89,6 +91,9 @@ model TaskRegistration {
   taskId    String
   userId    String
   date      String   // Format YYYY-MM-DD
+  dish      String?  // Plat cuisiné (si tâche cuisine)
+  recurring Boolean  @default(false) // Inscription récurrente (toutes les semaines)
+  slot      String?  // Créneau d'origine (ex: "Lun · Soir") pour récurrence
   task      Task     @relation(fields: [taskId], references: [id], onDelete: Cascade)
   user      User     @relation(fields: [userId], references: [id])
   createdAt DateTime @default(now())

@@ -21,6 +21,9 @@ export async function GET(req: NextRequest) {
         user: {
           select: { id: true, name: true },
         },
+        task: {
+          select: { isCooking: true, isRecurring: true },
+        },
       },
     });
 
@@ -37,7 +40,7 @@ export async function GET(req: NextRequest) {
 // POST - S'inscrire à une tâche pour une date
 export async function POST(req: NextRequest) {
   try {
-    const { taskId, userId, date } = await req.json();
+    const { taskId, userId, date, dish, recurring, slot } = await req.json();
 
     if (!taskId || !userId || !date) {
       return NextResponse.json(
@@ -51,11 +54,18 @@ export async function POST(req: NextRequest) {
       where: {
         taskId_userId_date: { taskId, userId, date },
       },
-      update: {},
+      update: {
+        ...(dish !== undefined ? { dish } : {}),
+        ...(recurring !== undefined ? { recurring } : {}),
+        ...(slot !== undefined ? { slot } : {}),
+      },
       create: {
         taskId,
         userId,
         date,
+        dish: dish || null,
+        recurring: recurring || false,
+        slot: slot || null,
       },
       include: {
         user: {
@@ -80,19 +90,33 @@ export async function DELETE(req: NextRequest) {
     const taskId = req.nextUrl.searchParams.get("taskId");
     const date = req.nextUrl.searchParams.get("date");
     const userId = req.nextUrl.searchParams.get("userId");
+    const recurring = req.nextUrl.searchParams.get("recurring");
 
-    if (!taskId || !date || !userId) {
+    if (!taskId || !userId) {
       return NextResponse.json(
-        { error: "taskId, date, and userId are required" },
+        { error: "taskId and userId are required" },
         { status: 400 }
       );
     }
 
-    await prisma.taskRegistration.delete({
-      where: {
-        taskId_userId_date: { taskId, userId, date },
-      },
-    });
+    // Si récurrent, supprimer toutes les inscriptions récurrentes de ce user pour cette tâche
+    if (recurring === "true") {
+      await prisma.taskRegistration.deleteMany({
+        where: { taskId, userId, recurring: true },
+      });
+    } else {
+      if (!date) {
+        return NextResponse.json(
+          { error: "date is required for non-recurring deletion" },
+          { status: 400 }
+        );
+      }
+      await prisma.taskRegistration.delete({
+        where: {
+          taskId_userId_date: { taskId, userId, date },
+        },
+      });
+    }
 
     return NextResponse.json({ success: true });
   } catch (error: any) {

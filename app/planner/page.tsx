@@ -41,6 +41,8 @@ type Task = {
   slot: string;
   schedules?: string[];
   familyId?: string;
+  isCooking?: boolean;
+  isRecurring?: boolean;
 };
 
 type Assignment = {
@@ -174,6 +176,8 @@ export default function PlannerPage() {
   const [newTaskTimeMode, setNewTaskTimeMode] = useState<"slot" | "time">("slot");
   const [newTaskTime, setNewTaskTime] = useState<string>("Matin");
   const [newTaskSchedules, setNewTaskSchedules] = useState<string[]>([]);
+  const [newTaskIsCooking, setNewTaskIsCooking] = useState(false);
+  const [newTaskIsRecurring, setNewTaskIsRecurring] = useState(false);
   const [newUnavailable, setNewUnavailable] = useState<string>("");
   const [selectedUser, setSelectedUser] = useState<string>("");
   const [currentUser, setCurrentUser] = useState<string | null>(null);
@@ -232,7 +236,7 @@ export default function PlannerPage() {
     today.setHours(0, 0, 0, 0);
     return today;
   });
-const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: string; userIds: string[] }>>({});
+const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: string; userIds: string[]; dishes?: Record<string, string>; recurringUsers?: string[] }>>({});
 
   // Mon Espace state
   const [showPastTasks, setShowPastTasks] = useState(false);
@@ -816,7 +820,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
   const claimTask = async (taskId: string, date: Date) => {
     if (!currentUser) return;
-    
+
     // Find the task to get its time slot
     const task = familyTasks.find(t => t.id === taskId);
     if (task) {
@@ -826,30 +830,85 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         return;
       }
     }
-    
+
+    // If cooking task, ask for dish
+    let dish: string | null = null;
+    if (task?.isCooking) {
+      const input = prompt('Quel plat cuisinez-vous ?');
+      if (input === null) return; // User cancelled
+      dish = input.trim() || null;
+    }
+
+    // Determine slot for recurring
+    let taskSlot: string | null = null;
+    if (task?.isRecurring) {
+      const dayNames = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+      const dayName = dayNames[date.getDay()];
+      const schedules = task.schedules || [task.slot];
+      taskSlot = schedules.find(s => s.startsWith(dayName)) || `${dayName} · Matin`;
+    }
+
     const key = getTaskAssignmentKey(taskId, date);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
-    
+
     // Update local state - add user to existing list or create new
     setTaskAssignments(prev => {
       const existing = prev[key];
       const existingUserIds = existing?.userIds || [];
       if (existingUserIds.includes(currentUser)) return prev; // Already assigned
-      return {
+      const updated = {
         ...prev,
-        [key]: { date: dateStr, userIds: [...existingUserIds, currentUser] }
+        [key]: {
+          date: dateStr,
+          userIds: [...existingUserIds, currentUser],
+          dishes: { ...(existing?.dishes || {}), ...(dish ? { [currentUser]: dish } : {}) },
+          recurringUsers: task?.isRecurring
+            ? [...(existing?.recurringUsers || []), currentUser]
+            : (existing?.recurringUsers || []),
+        }
       };
+
+      // If recurring, expand to future weeks in local state
+      if (task?.isRecurring) {
+        for (let w = 1; w <= 8; w++) {
+          const futureDate = new Date(date);
+          futureDate.setDate(futureDate.getDate() + (w * 7));
+          const fy = futureDate.getFullYear();
+          const fm = String(futureDate.getMonth() + 1).padStart(2, '0');
+          const fd = String(futureDate.getDate()).padStart(2, '0');
+          const futureDateStr = `${fy}-${fm}-${fd}`;
+          const futureKey = `${taskId}_${futureDateStr}`;
+          const futureExisting = updated[futureKey];
+          const futureUserIds = futureExisting?.userIds || [];
+          if (!futureUserIds.includes(currentUser)) {
+            updated[futureKey] = {
+              date: futureDateStr,
+              userIds: [...futureUserIds, currentUser],
+              dishes: { ...(futureExisting?.dishes || {}), ...(dish ? { [currentUser]: dish } : {}) },
+              recurringUsers: [...(futureExisting?.recurringUsers || []), currentUser],
+            };
+          }
+        }
+      }
+
+      return updated;
     });
-    
+
     // Save to database
     try {
       await fetch('/api/task-registrations', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ taskId, userId: currentUser, date: dateStr }),
+        body: JSON.stringify({
+          taskId,
+          userId: currentUser,
+          date: dateStr,
+          ...(dish ? { dish } : {}),
+          ...(task?.isRecurring ? { recurring: true, slot: taskSlot } : {}),
+        }),
       });
     } catch (error) {
       console.error('Failed to save registration', error);
@@ -858,26 +917,61 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
   const unclaimTask = async (taskId: string, date: Date) => {
     if (!currentUser) return;
+    const task = familyTasks.find(t => t.id === taskId);
+    const isRecurringReg = task?.isRecurring && taskAssignments[getTaskAssignmentKey(taskId, date)]?.recurringUsers?.includes(currentUser);
     const key = getTaskAssignmentKey(taskId, date);
     const year = date.getFullYear();
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     const dateStr = `${year}-${month}-${day}`;
-    
+
     // Update local state - remove current user from list
     setTaskAssignments(prev => {
-      const existing = prev[key];
+      const updated = { ...prev };
+      const existing = updated[key];
       const existingUserIds = existing?.userIds || [];
       const newUserIds = existingUserIds.filter(id => id !== currentUser);
-      return {
-        ...prev,
-        [key]: { date: dateStr, userIds: newUserIds }
-      };
+      const newDishes = { ...(existing?.dishes || {}) };
+      delete newDishes[currentUser];
+      const newRecurringUsers = (existing?.recurringUsers || []).filter(id => id !== currentUser);
+      updated[key] = { date: dateStr, userIds: newUserIds, dishes: newDishes, recurringUsers: newRecurringUsers };
+
+      // If recurring, remove from all future weeks too
+      if (isRecurringReg) {
+        for (let w = 1; w <= 8; w++) {
+          const futureDate = new Date(date);
+          futureDate.setDate(futureDate.getDate() + (w * 7));
+          const fy = futureDate.getFullYear();
+          const fm = String(futureDate.getMonth() + 1).padStart(2, '0');
+          const fd = String(futureDate.getDate()).padStart(2, '0');
+          const futureDateStr = `${fy}-${fm}-${fd}`;
+          const futureKey = `${taskId}_${futureDateStr}`;
+          const futureExisting = updated[futureKey];
+          if (futureExisting) {
+            const futureDishes = { ...(futureExisting.dishes || {}) };
+            delete futureDishes[currentUser];
+            updated[futureKey] = {
+              date: futureDateStr,
+              userIds: futureExisting.userIds.filter(id => id !== currentUser),
+              dishes: futureDishes,
+              recurringUsers: (futureExisting.recurringUsers || []).filter(id => id !== currentUser),
+            };
+          }
+        }
+      }
+
+      return updated;
     });
-    
+
     // Delete from database
     try {
-      await fetch(`/api/task-registrations?taskId=${taskId}&date=${dateStr}&userId=${currentUser}`, {
+      const params = new URLSearchParams({ taskId, userId: currentUser });
+      if (isRecurringReg) {
+        params.set('recurring', 'true');
+      } else {
+        params.set('date', dateStr);
+      }
+      await fetch(`/api/task-registrations?${params.toString()}`, {
         method: 'DELETE',
       });
     } catch (error) {
@@ -2080,6 +2174,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               slot: t.slot,
               schedules: t.frequency ? JSON.parse(t.frequency) : [t.slot],
               familyId: t.familyId,
+              isCooking: t.isCooking || false,
+              isRecurring: t.isRecurring || false,
             }));
             setTasks(mappedTasks);
             
@@ -2088,15 +2184,50 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               const registrationsRes = await fetch(`/api/task-registrations?familyId=${family.id}`);
               if (registrationsRes.ok) {
                 const registrationsData = await registrationsRes.json();
-                const newAssignments: Record<string, { date: string; userIds: string[] }> = {};
-                for (const reg of registrationsData) {
-                  const key = `${reg.taskId}_${reg.date}`;  // Use underscore to match getTaskAssignmentKey
-                  // Group by key to collect all userIds
+                const newAssignments: Record<string, { date: string; userIds: string[]; dishes?: Record<string, string>; recurringUsers?: string[] }> = {};
+
+                // Helper to add a user to a key
+                const addToKey = (key: string, dateStr: string, userId: string, dish?: string | null, isRecurring?: boolean) => {
                   if (!newAssignments[key]) {
-                    newAssignments[key] = { date: reg.date, userIds: [] };
+                    newAssignments[key] = { date: dateStr, userIds: [] };
                   }
-                  if (reg.userId && !newAssignments[key].userIds.includes(reg.userId)) {
-                    newAssignments[key].userIds.push(reg.userId);
+                  if (userId && !newAssignments[key].userIds.includes(userId)) {
+                    newAssignments[key].userIds.push(userId);
+                  }
+                  if (dish) {
+                    if (!newAssignments[key].dishes) newAssignments[key].dishes = {};
+                    newAssignments[key].dishes![userId] = dish;
+                  }
+                  if (isRecurring) {
+                    if (!newAssignments[key].recurringUsers) newAssignments[key].recurringUsers = [];
+                    if (!newAssignments[key].recurringUsers!.includes(userId)) {
+                      newAssignments[key].recurringUsers!.push(userId);
+                    }
+                  }
+                };
+
+                for (const reg of registrationsData) {
+                  const key = `${reg.taskId}_${reg.date}`;
+                  addToKey(key, reg.date, reg.userId, reg.dish, reg.recurring);
+
+                  // If recurring, expand to future weeks (next 8 weeks)
+                  if (reg.recurring && reg.slot) {
+                    const slotDay = reg.slot.split(' · ')[0]; // e.g. "Lun"
+                    const dayMap: Record<string, number> = { 'Lun': 1, 'Mar': 2, 'Mer': 3, 'Jeu': 4, 'Ven': 5, 'Sam': 6, 'Dim': 0 };
+                    const targetDayOfWeek = dayMap[slotDay];
+                    if (targetDayOfWeek !== undefined) {
+                      const regDate = new Date(reg.date + 'T00:00:00');
+                      for (let w = 1; w <= 8; w++) {
+                        const futureDate = new Date(regDate);
+                        futureDate.setDate(futureDate.getDate() + (w * 7));
+                        const y = futureDate.getFullYear();
+                        const m = String(futureDate.getMonth() + 1).padStart(2, '0');
+                        const d = String(futureDate.getDate()).padStart(2, '0');
+                        const futureDateStr = `${y}-${m}-${d}`;
+                        const futureKey = `${reg.taskId}_${futureDateStr}`;
+                        addToKey(futureKey, futureDateStr, reg.userId, reg.dish, true);
+                      }
+                    }
                   }
                 }
                 setTaskAssignments(prev => ({ ...prev, ...newAssignments }));
@@ -2693,6 +2824,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             slot: scheduleList[0],
             schedules: scheduleList,
             familyId: selectedFamily,
+            isCooking: newTaskIsCooking,
+            isRecurring: newTaskIsRecurring,
           }),
         });
 
@@ -2706,11 +2839,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             slot: createdTask.slot,
             schedules: scheduleList,
             familyId: createdTask.familyId,
+            isCooking: createdTask.isCooking || false,
+            isRecurring: createdTask.isRecurring || false,
           }]);
           setNewTask({ title: "", duration: 30, penibility: 30 });
           setNewTaskDay(dayOptions[0]);
           setNewTaskTime("08:00");
           setNewTaskSchedules([]);
+          setNewTaskIsCooking(false);
+          setNewTaskIsRecurring(false);
         } else {
           const errData = await res.json();
           alert("Erreur: " + (errData.error || "Échec création"));
@@ -4167,6 +4304,25 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 </div>
               </div>
 
+              <div className={styles.taskOptionToggles}>
+                <label className={styles.taskOptionToggle}>
+                  <input
+                    type="checkbox"
+                    checked={newTaskIsCooking}
+                    onChange={(e) => setNewTaskIsCooking(e.target.checked)}
+                  />
+                  <span>Tâche de cuisine</span>
+                </label>
+                <label className={styles.taskOptionToggle}>
+                  <input
+                    type="checkbox"
+                    checked={newTaskIsRecurring}
+                    onChange={(e) => setNewTaskIsRecurring(e.target.checked)}
+                  />
+                  <span>Inscription récurrente</span>
+                </label>
+              </div>
+
               <div className={styles.taskFormActions}>
                 <button 
                   className={styles.addTaskBtn} 
@@ -4675,7 +4831,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             const isPartiallyAssigned = assignedUserIds.length > 0 && !isAssignedToMe; // Others took it but I can still join
                             const iAmBusy = currentUser ? isUserBusyAtTime(currentUser, day, timeSlot) : false;
                             const pointsBreakdown = getPointsBreakdown(task);
-                            const assignedNames = assignedUserIds.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
+                            const assignedNames = assignedUserIds.map(id => {
+                              const name = users.find(u => u.id === id)?.name;
+                              const dish = task.isCooking && assignment?.dishes?.[id];
+                              return dish ? `${name} (${dish})` : name;
+                            }).filter(Boolean).join(', ');
                             const taskKey = getTaskAssignmentKey(task.id, day);
 
                             return (
@@ -5786,7 +5946,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           const isAssigned = assignedUserIds.length > 0;
                           const iAmBusy = currentUser ? isUserBusyAtTime(currentUser, currentDay, item.timeSlot) : false;
                           const firstAssignedUser = assignedUserIds[0];
-                          const assignedNames = assignedUserIds.map(id => users.find(u => u.id === id)?.name).filter(Boolean).join(', ');
+                          const assignedNames = assignedUserIds.map(id => {
+                            const name = users.find(u => u.id === id)?.name;
+                            const dish = item.task.isCooking && assignment?.dishes?.[id];
+                            return dish ? `${name} (${dish})` : name;
+                          }).filter(Boolean).join(', ');
                           const pointsDivider = isMyTask ? assignedUserIds.length : 1;
                           const displayPoints = Math.round(item.points / pointsDivider);
                           
@@ -6115,8 +6279,27 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           </div>
                         )}
                       </div>
-                      
-                      <button 
+
+                      <div className={styles.taskOptionToggles}>
+                        <label className={styles.taskOptionToggle}>
+                          <input
+                            type="checkbox"
+                            checked={newTaskIsCooking}
+                            onChange={(e) => setNewTaskIsCooking(e.target.checked)}
+                          />
+                          <span>Tâche de cuisine</span>
+                        </label>
+                        <label className={styles.taskOptionToggle}>
+                          <input
+                            type="checkbox"
+                            checked={newTaskIsRecurring}
+                            onChange={(e) => setNewTaskIsRecurring(e.target.checked)}
+                          />
+                          <span>Inscription récurrente</span>
+                        </label>
+                      </div>
+
+                      <button
                         className={styles.mobileCreateBtnFull} 
                         onClick={() => {
                           if (mobileNewTaskSchedules.length > 0) {
