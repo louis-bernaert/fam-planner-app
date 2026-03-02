@@ -1001,6 +1001,102 @@
   cursor: pointer;
 }
 
+/* Dish Modal */
+.dishModalContent {
+  background-color: var(--color-surface);
+  border-radius: var(--radius-xl);
+  max-width: 380px;
+  width: 100%;
+  overflow: hidden;
+  box-shadow: var(--shadow-xl);
+  animation: slideUp 0.2s ease;
+}
+
+.dishModalHeader {
+  padding: var(--space-4) var(--space-5);
+  background-color: var(--color-accent, #18181b);
+  color: white;
+}
+
+.dishModalHeader h4 {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+}
+
+.dishModalBody {
+  padding: var(--space-4) var(--space-5);
+}
+
+.dishModalInput {
+  width: 100%;
+  padding: var(--space-3);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  font-size: 0.95rem;
+  margin-bottom: var(--space-4);
+  background-color: var(--color-surface);
+  color: var(--color-text);
+  outline: none;
+  box-sizing: border-box;
+}
+
+.dishModalInput:focus {
+  border-color: var(--color-accent, #18181b);
+  box-shadow: 0 0 0 2px rgba(24, 24, 27, 0.1);
+}
+
+.dishModalActions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+.dishModalCancel {
+  padding: var(--space-2) var(--space-4);
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  background: transparent;
+  color: var(--color-text-secondary);
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.dishModalCancel:hover {
+  background-color: var(--color-muted, #f4f4f5);
+}
+
+.dishModalConfirm {
+  padding: var(--space-2) var(--space-4);
+  border: none;
+  border-radius: var(--radius-md);
+  background-color: var(--color-accent, #18181b);
+  color: white;
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+
+.dishModalConfirm:hover {
+  opacity: 0.9;
+}
+
+/* Recurring Badge */
+.recurringBadge {
+  display: inline;
+  font-size: 0.8em;
+  color: var(--color-primary, #3b82f6);
+  font-weight: 400;
+}
+
+/* Dish Label */
+.dishLabel {
+  font-size: 0.8rem;
+  color: var(--color-text-secondary, #71717a);
+  font-style: italic;
+  font-weight: 400;
+}
+
 .taskFormActions {
   display: flex;
   justify-content: flex-end;

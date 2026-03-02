@@ -302,6 +302,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const [mobileShowTaskForm, setMobileShowTaskForm] = useState(false);
   const [mobileShowExceptionalForm, setMobileShowExceptionalForm] = useState(false);
   const [mobileDelegationModal, setMobileDelegationModal] = useState<{ taskId: string; date: Date } | null>(null);
+  const [dishModal, setDishModal] = useState<{ taskId: string; date: Date } | null>(null);
+  const [dishInput, setDishInput] = useState('');
 
   // Fermer le menu admin quand on clique en dehors
   useEffect(() => {
@@ -831,13 +833,28 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       }
     }
 
-    // If cooking task, ask for dish
-    let dish: string | null = null;
+    // If cooking task, open dish modal instead
     if (task?.isCooking) {
-      const input = prompt('Quel plat cuisinez-vous ?');
-      if (input === null) return; // User cancelled
-      dish = input.trim() || null;
+      setDishModal({ taskId, date });
+      setDishInput('');
+      return;
     }
+
+    // Non-cooking task: register directly
+    await registerForTask(taskId, date, null);
+  };
+
+  const confirmDishAndClaim = async () => {
+    if (!dishModal) return;
+    const dish = dishInput.trim() || null;
+    setDishModal(null);
+    setDishInput('');
+    await registerForTask(dishModal.taskId, dishModal.date, dish);
+  };
+
+  const registerForTask = async (taskId: string, date: Date, dish: string | null) => {
+    if (!currentUser) return;
+    const task = familyTasks.find(t => t.id === taskId);
 
     // Determine slot for recurring
     let taskSlot: string | null = null;
@@ -3825,7 +3842,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     {getMyUpcomingTasks().length === 0 ? (
                       <p className={styles.noTasks}>Aucune tâche à venir. Prenez des tâches dans le Planificateur !</p>
                     ) : (
-                      getMyUpcomingTasks().map((item, idx) => (
+                      getMyUpcomingTasks().map((item, idx) => {
+                        const upcomingAssignment = getTaskAssignment(item.task.id, item.date);
+                        const myDish = item.task.isCooking && upcomingAssignment?.dishes?.[currentUser || ''];
+                        return (
                         <div key={`${item.task.id}-${idx}`} className={styles.myTaskCard}>
                           <div className={styles.myTaskDate} style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '70px' }}>
                             <span style={{ fontWeight: 500 }}>
@@ -3834,12 +3854,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{formatTimeDisplay(item.timeSlot)}</span>
                           </div>
                           <div className={styles.myTaskInfo}>
-                            <strong>{item.task.title}</strong>
+                            <strong>{item.task.title}{item.task.isRecurring && <span className={styles.recurringBadge} title="Récurrente"> ↻</span>}</strong>
+                            {myDish && <span className={styles.dishLabel}>{myDish}</span>}
                             <span className={styles.taskMeta}>{item.task.duration} min · Pénibilité {item.task.penibility}%</span>
                           </div>
                           <span className={styles.taskPoints}>+{item.points} pts</span>
                         </div>
-                      ))
+                        );
+                      })
                     )}
                   </div>
                 </div>
@@ -4844,7 +4866,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 className={`${styles.plannerTask} ${isAssignedToMe ? styles.myTask : ''} ${isAssignedToOther ? styles.takenTask : ''} ${iAmBusy && !isAssignedToOther && !isAssignedToMe ? styles.busyTask : ''}`}
                               >
                                 <div className={styles.plannerTaskInfo}>
-                                  <strong>{task.title}</strong>
+                                  <strong>{task.title}{task.isRecurring && <span className={styles.recurringBadge} title="Tâche récurrente"> ↻</span>}</strong>
                                   <span className={styles.taskDetails}>
                                     {task.duration} min · Pénibilité {task.penibility}%
                                   </span>
@@ -4862,12 +4884,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                     </span>
                                   )}
                                   {isAssignedToMe && (
-                                    <button 
+                                    <button
                                       className={styles.unclaimBtn}
                                       onClick={() => unclaimTask(task.id, day)}
                                     >
                                       <Icon name="check" size={12} />
-                                      Pris par moi{assignedUserIds.length > 1 ? ` (+${assignedUserIds.length - 1})` : ''} · Annuler
+                                      Pris par moi{task.isCooking && assignment?.dishes?.[currentUser || ''] ? ` (${assignment.dishes[currentUser || '']})` : ''}{assignedUserIds.length > 1 ? ` (+${assignedUserIds.length - 1})` : ''} · Annuler
                                     </button>
                                   )}
                                   {assignedUserIds.length === 0 && !iAmBusy && (
@@ -5673,17 +5695,22 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         Prochaines tâches
                       </h3>
                       <div className={styles.mobileTaskList}>
-                        {getMyUpcomingTasks().slice(0, 4).map((item, idx) => (
+                        {getMyUpcomingTasks().slice(0, 4).map((item, idx) => {
+                          const mobileUpcomingAssignment = getTaskAssignment(item.task.id, item.date);
+                          const mobileMyDish = item.task.isCooking && mobileUpcomingAssignment?.dishes?.[currentUser || ''];
+                          return (
                           <div key={`mobile-task-${idx}`} className={styles.mobileTaskItem}>
                             <div className={styles.mobileTaskLeft}>
-                              <span className={styles.mobileTaskTitle}>{item.task.title}</span>
+                              <span className={styles.mobileTaskTitle}>{item.task.title}{item.task.isRecurring && <span className={styles.recurringBadge} title="Récurrente"> ↻</span>}</span>
+                              {mobileMyDish && <span className={styles.dishLabel}>{mobileMyDish}</span>}
                               <span className={styles.mobileTaskMeta}>
                                 {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })} · {formatTimeDisplay(item.timeSlot)}
                               </span>
                             </div>
                             <span className={styles.mobileTaskPoints}>+{item.points}</span>
                           </div>
-                        ))}
+                          );
+                        })}
                         {getMyUpcomingTasks().length > 4 && (
                           <button className={styles.mobileShowMore}>
                             Voir tout ({getMyUpcomingTasks().length})
@@ -5962,7 +5989,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                   style={{ backgroundColor: isAssigned ? `hsl(${(users.findIndex(u => u.id === firstAssignedUser) * 60) % 360}, 60%, 50%)` : 'var(--color-muted)' }}
                                 />
                                 <div className={styles.mobileTaskLeft}>
-                                  <span className={styles.mobileTaskTitle}>{item.task.title}</span>
+                                  <span className={styles.mobileTaskTitle}>{item.task.title}{item.task.isRecurring && <span className={styles.recurringBadge} title="Récurrente"> ↻</span>}</span>
                                   <span className={styles.mobileTaskMeta}>
                                     {formatTimeDisplay(item.timeSlot)} · {isAssigned ? assignedNames || 'Inconnu' : 'Libre'}
                                   </span>
@@ -6786,6 +6813,32 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   >
                     Annuler
                   </button>
+                </div>
+              </div>
+            )}
+
+            {/* Dish Input Modal */}
+            {dishModal && (
+              <div className={styles.eventModal} onClick={() => setDishModal(null)}>
+                <div className={styles.dishModalContent} onClick={(e) => e.stopPropagation()}>
+                  <div className={styles.dishModalHeader}>
+                    <h4>Quel plat cuisinez-vous ?</h4>
+                  </div>
+                  <div className={styles.dishModalBody}>
+                    <input
+                      type="text"
+                      value={dishInput}
+                      onChange={(e) => setDishInput(e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') confirmDishAndClaim(); }}
+                      placeholder="Ex: Pâtes carbonara"
+                      className={styles.dishModalInput}
+                      autoFocus
+                    />
+                    <div className={styles.dishModalActions}>
+                      <button className={styles.dishModalCancel} onClick={() => setDishModal(null)}>Annuler</button>
+                      <button className={styles.dishModalConfirm} onClick={confirmDishAndClaim}>Confirmer</button>
+                    </div>
+                  </div>
                 </div>
               </div>
             )}
