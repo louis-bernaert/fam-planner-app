@@ -57,6 +57,13 @@ export default function SettingsPage() {
           </div>
           <span className={styles.gridLabel}>Points</span>
         </Link>
+
+        <Link href="/settings/notifications" className={styles.gridCard}>
+          <div className={styles.gridIcon}>
+            <Icon name="bell" size={24} />
+          </div>
+          <span className={styles.gridLabel}>Notifications</span>
+        </Link>
       </div>
 
       <div className={styles.backLink}>

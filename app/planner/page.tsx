@@ -304,6 +304,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const [mobileDelegationModal, setMobileDelegationModal] = useState<{ taskId: string; date: Date } | null>(null);
   const [dishModal, setDishModal] = useState<{ taskId: string; date: Date } | null>(null);
   const [dishInput, setDishInput] = useState('');
+  const [showFreeTasksNotif, setShowFreeTasksNotif] = useState(true);
+  const [showEvalNotif, setShowEvalNotif] = useState(true);
 
   // Fermer le menu admin quand on clique en dehors
   useEffect(() => {
@@ -317,6 +319,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [adminAssignMenu]);
+
+  // Lecture des préférences de notification
+  useEffect(() => {
+    const freePref = localStorage.getItem('notif_freeTasks');
+    const evalPref = localStorage.getItem('notif_evalTasks');
+    if (freePref === 'false') setShowFreeTasksNotif(false);
+    if (evalPref === 'false') setShowEvalNotif(false);
+  }, []);
 
   // Theme state
   const [theme, setTheme] = useState<Theme>(() => {
@@ -1113,6 +1123,26 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const getMyEvaluation = (taskId: string) => {
     if (!currentUser) return null;
     return taskEvaluations.find(e => e.taskId === taskId && e.userId === currentUser) || null;
+  };
+
+  // Détection des tâches libres pour demain
+  const getFreeTasksTomorrow = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    tomorrow.setHours(0, 0, 0, 0);
+    const tasksForTomorrow = getTasksForDay(tomorrow);
+    return tasksForTomorrow.filter(task => {
+      const assignment = getTaskAssignment(task.id, tomorrow);
+      return !assignment || assignment.userIds.length === 0;
+    });
+  };
+
+  // Détection des tâches non auto-évaluées
+  const getUnevaluatedTasks = () => {
+    if (!currentUser) return [];
+    return familyTasks.filter(task => {
+      return !taskEvaluations.find(e => e.taskId === task.id && e.userId === currentUser);
+    });
   };
 
   // Sauvegarder une évaluation
@@ -3835,6 +3865,45 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               </p>
             ) : (
               <>
+                {/* Notification banners */}
+                {showFreeTasksNotif && getFreeTasksTomorrow().length > 0 && (
+                  <div className={styles.notifBanner}>
+                    <div className={styles.notifBannerContent}>
+                      <Icon name="info" size={16} />
+                      <span>
+                        <strong>{getFreeTasksTomorrow().length} tâche{getFreeTasksTomorrow().length > 1 ? 's' : ''}</strong> sans inscrit pour demain !
+                      </span>
+                    </div>
+                    <div className={styles.notifBannerActions}>
+                      <button className={styles.notifBannerBtn} onClick={() => { setSelectedCalendarDay((() => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(0,0,0,0); return d; })()); setActiveTab('planificateur'); }}>
+                        Voir le planificateur
+                      </button>
+                      <button className={styles.notifBannerClose} onClick={() => setShowFreeTasksNotif(false)}>
+                        <Icon name="xmark" size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
+                {showEvalNotif && getUnevaluatedTasks().length > 0 && (
+                  <div className={styles.notifBanner} data-type="eval">
+                    <div className={styles.notifBannerContent}>
+                      <Icon name="target" size={16} />
+                      <span>
+                        <strong>{getUnevaluatedTasks().length} tâche{getUnevaluatedTasks().length > 1 ? 's' : ''}</strong> à auto-évaluer
+                      </span>
+                    </div>
+                    <div className={styles.notifBannerActions}>
+                      <button className={styles.notifBannerBtn} onClick={() => setActiveTab('taches')}>
+                        Évaluer
+                      </button>
+                      <button className={styles.notifBannerClose} onClick={() => setShowEvalNotif(false)}>
+                        <Icon name="xmark" size={14} />
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {/* Prochaines tâches */}
                 <div className={styles.monEspaceSection}>
                   <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="clipboardList" size={16} />Mes prochaines tâches</h4>
