@@ -306,6 +306,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const [dishInput, setDishInput] = useState('');
   const [showFreeTasksNotif, setShowFreeTasksNotif] = useState(true);
   const [showEvalNotif, setShowEvalNotif] = useState(true);
+  const [rankingPeriod, setRankingPeriod] = useState<'week' | 'month' | 'all'>('all');
+  const [rankingMetric, setRankingMetric] = useState<'points' | 'tasks' | 'time'>('points');
 
   // Fermer le menu admin quand on clique en dehors
   useEffect(() => {
@@ -1743,6 +1745,97 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     const leaderboard = getFamilyLeaderboard();
     if (leaderboard.length === 0) return 100;
     return Math.max(leaderboard[0].totalPoints, 100);
+  };
+
+  // Classement filtré par période et métrique
+  const getFilteredUserStats = (userId: string) => {
+    let startDate: Date | null = null;
+    if (rankingPeriod === 'week') {
+      startDate = getWeekStart(new Date());
+    } else if (rankingPeriod === 'month') {
+      const now = new Date();
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    }
+
+    const isInPeriod = (dateStr: string) => {
+      if (!startDate) return true;
+      const [y, m, d] = dateStr.split('-').map(Number);
+      const taskDate = new Date(y, m - 1, d);
+      return taskDate >= startDate;
+    };
+
+    const filteredValidated = validatedTasks.filter(v =>
+      v.userId === userId && v.validated && isInPeriod(v.date)
+    );
+    const filteredExceptional = exceptionalTasks.filter(t =>
+      t.userId === userId && t.validated && isInPeriod(t.date)
+    );
+
+    const points = filteredValidated.reduce((sum, v) => {
+      const task = familyTasks.find(t => t.id === v.taskId);
+      return sum + (task ? calculateTaskPoints(task) : 0);
+    }, 0) + filteredExceptional.reduce((sum, t) => sum + calculateExceptionalPoints(t), 0);
+
+    const taskCount = filteredValidated.length + filteredExceptional.length;
+
+    const time = filteredValidated.reduce((sum, v) => {
+      const task = familyTasks.find(t => t.id === v.taskId);
+      if (!task) return sum;
+      const evals = taskEvaluations.filter(e => e.taskId === task.id);
+      if (evals.length > 0) {
+        const durations = evals.map(e => e.duration).sort((a, b) => a - b);
+        const median = durations.length % 2 === 0
+          ? (durations[durations.length / 2 - 1] + durations[durations.length / 2]) / 2
+          : durations[Math.floor(durations.length / 2)];
+        return sum + median;
+      }
+      return sum + task.duration;
+    }, 0) + filteredExceptional.reduce((sum, t) => sum + t.duration, 0);
+
+    return { points, taskCount, time };
+  };
+
+  const getFilteredLeaderboard = () => {
+    return familyUsers
+      .filter(user => user.participatesInLeaderboard !== false)
+      .map(user => {
+        const stats = getFilteredUserStats(user.id);
+        return {
+          ...user,
+          value: rankingMetric === 'points' ? stats.points
+               : rankingMetric === 'tasks' ? stats.taskCount
+               : stats.time,
+          totalPoints: stats.points,
+          taskCount: stats.taskCount,
+          time: stats.time,
+        };
+      })
+      .sort((a, b) => b.value - a.value);
+  };
+
+  const getFilteredMaxValue = () => {
+    const lb = getFilteredLeaderboard();
+    if (lb.length === 0) return 100;
+    return Math.max(lb[0].value, 1);
+  };
+
+  const formatDuration = (minutes: number) => {
+    if (minutes < 60) return `${Math.round(minutes)} min`;
+    const h = Math.floor(minutes / 60);
+    const m = Math.round(minutes % 60);
+    return m > 0 ? `${h}h${m.toString().padStart(2, '0')}` : `${h}h`;
+  };
+
+  const formatMetricValue = (value: number) => {
+    if (rankingMetric === 'points') return `${value} pts`;
+    if (rankingMetric === 'tasks') return `${value} tâche${value > 1 ? 's' : ''}`;
+    return formatDuration(value);
+  };
+
+  const formatMetricSubtext = (user: { taskCount: number; time: number; totalPoints: number }) => {
+    if (rankingMetric === 'points') return `${user.taskCount} tâche${user.taskCount > 1 ? 's' : ''} validée${user.taskCount > 1 ? 's' : ''}`;
+    if (rankingMetric === 'tasks') return `${user.totalPoints} pts`;
+    return `${user.taskCount} tâche${user.taskCount > 1 ? 's' : ''}`;
   };
 
   // Obtenir l'historique détaillé des gains d'un utilisateur
@@ -5168,7 +5261,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
             {/* Classement */}
             <div className={styles.scoreCard}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="trophy" size={18} />Classement total</h3>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="trophy" size={18} />Classement</h3>
               {!selectedFamily ? (
                 <p className={styles.mutedSmall} style={{ color: "#ff6b6b", display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <Icon name="warning" size={14} />Sélectionnez une famille pour voir le classement
@@ -5176,37 +5269,49 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               ) : familyUsers.length === 0 ? (
                 <p className={styles.mutedSmall}>Aucun membre dans la famille</p>
               ) : (
-                getFamilyLeaderboard().map((user, idx) => {
-                  const maxPoints = getMaxPoints();
-                  const percentage = maxPoints > 0 ? (user.totalPoints / maxPoints) * 100 : 0;
-                  const isMe = user.id === currentUser;
-                  
-                  return (
-                    <div 
-                      key={user.id} 
-                      className={`${styles.scoreRow} ${isMe ? styles.myScoreRow : ''} ${styles.clickableRow}`}
-                      onClick={() => setPointsHistoryModal({ userId: user.id, userName: user.name })}
-                      title="Cliquez pour voir l'historique des gains"
-                    >
-                      <div className={styles.rankBadge}>
-                        {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
-                      </div>
-                      <div className={styles.scoreUserInfo}>
-                        <p>{user.name} {isMe && <span className={styles.meBadge}>(moi)</span>}</p>
-                        <span className={styles.taskMeta}>
-                          {user.validatedCount} tâche{user.validatedCount > 1 ? 's' : ''} validée{user.validatedCount > 1 ? 's' : ''}
-                        </span>
-                      </div>
-                      <div className={styles.scoreBar}>
-                        <div style={{ width: `${percentage}%` }} />
-                      </div>
-                      <div className={styles.scorePointsWithIcon}>
-                        <strong className={styles.scorePoints}>{user.totalPoints} pts</strong>
-                        <Icon name="chevronRight" size={14} style={{ color: 'var(--color-text-muted)' }} />
-                      </div>
+                <>
+                  <div className={styles.rankingFilters}>
+                    <div className={styles.rankingFilterGroup}>
+                      <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'week' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('week')}>Semaine</button>
+                      <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'month' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('month')}>Mois</button>
+                      <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'all' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('all')}>Toujours</button>
                     </div>
-                  );
-                })
+                    <div className={styles.rankingFilterGroup}>
+                      <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'points' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('points')}>Points</button>
+                      <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'tasks' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('tasks')}>Tâches</button>
+                      <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'time' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('time')}>Temps</button>
+                    </div>
+                  </div>
+                  {getFilteredLeaderboard().map((user, idx) => {
+                    const maxValue = getFilteredMaxValue();
+                    const percentage = maxValue > 0 ? (user.value / maxValue) * 100 : 0;
+                    const isMe = user.id === currentUser;
+
+                    return (
+                      <div
+                        key={user.id}
+                        className={`${styles.scoreRow} ${isMe ? styles.myScoreRow : ''} ${styles.clickableRow}`}
+                        onClick={() => setPointsHistoryModal({ userId: user.id, userName: user.name })}
+                        title="Cliquez pour voir l'historique des gains"
+                      >
+                        <div className={styles.rankBadge}>
+                          {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
+                        </div>
+                        <div className={styles.scoreUserInfo}>
+                          <p>{user.name} {isMe && <span className={styles.meBadge}>(moi)</span>}</p>
+                          <span className={styles.taskMeta}>{formatMetricSubtext(user)}</span>
+                        </div>
+                        <div className={styles.scoreBar}>
+                          <div style={{ width: `${percentage}%` }} />
+                        </div>
+                        <div className={styles.scorePointsWithIcon}>
+                          <strong className={styles.scorePoints}>{formatMetricValue(user.value)}</strong>
+                          <Icon name="chevronRight" size={14} style={{ color: 'var(--color-text-muted)' }} />
+                        </div>
+                      </div>
+                    );
+                  })}
+                </>
               )}
             </div>
 
@@ -6186,21 +6291,33 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
                   {/* Leaderboard */}
                   <div className={styles.mobileLeaderboard}>
-                    {users.sort((a, b) => (getUserTotalPoints(b.id) - getUserTotalPoints(a.id))).map((user, idx) => (
-                      <button 
-                        key={user.id} 
+                    <div className={styles.rankingFilters}>
+                      <div className={styles.rankingFilterGroup}>
+                        <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'week' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('week')}>Semaine</button>
+                        <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'month' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('month')}>Mois</button>
+                        <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'all' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('all')}>Toujours</button>
+                      </div>
+                      <div className={styles.rankingFilterGroup}>
+                        <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'points' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('points')}>Points</button>
+                        <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'tasks' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('tasks')}>Tâches</button>
+                        <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'time' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('time')}>Temps</button>
+                      </div>
+                    </div>
+                    {getFilteredLeaderboard().map((user, idx) => (
+                      <button
+                        key={user.id}
                         className={`${styles.mobileLeaderItem} ${idx === 0 ? styles.mobileLeaderFirst : ''} ${user.id === currentUser ? styles.mobileLeaderMe : ''} ${mobileSelectedUser === user.id ? styles.mobileLeaderSelected : ''}`}
                         onClick={() => setMobileSelectedUser(mobileSelectedUser === user.id ? null : user.id)}
                       >
                         <span className={styles.mobileLeaderRank}>#{idx + 1}</span>
-                        <div 
+                        <div
                           className={styles.mobileLeaderAvatar}
                           style={{ backgroundColor: `hsl(${(users.indexOf(user) * 60) % 360}, 60%, 50%)` }}
                         >
                           {user.name.charAt(0)}
                         </div>
                         <span className={styles.mobileLeaderName}>{user.name} {user.id === currentUser && '(moi)'}</span>
-                        <span className={styles.mobileLeaderPoints}>{getUserTotalPoints(user.id)} pts</span>
+                        <span className={styles.mobileLeaderPoints}>{formatMetricValue(user.value)}</span>
                       </button>
                     ))}
                   </div>
