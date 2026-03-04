@@ -4551,7 +4551,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             <div className={styles.taskListHeader}>
               <h4>
                 <Icon name="listCheck" size={18} />
-                Liste des tâches
+                {t.planner.allTasksList}
                 <span className={styles.taskCount}>{familyTasks.length}</span>
               </h4>
             </div>
@@ -4974,7 +4974,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               <div className={styles.plannerNav}>
                 <button onClick={() => navigatePlannerDays(-1)} className={styles.navBtn}>
                   <Icon name="arrowLeft" size={12} />
-                  <span>Précédent</span>
+                  <span>{t.planner.previous}</span>
                 </button>
                 <button 
                   onClick={() => setPlannerStartDate(new Date())} 
@@ -4983,7 +4983,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   {t.planner.today}
                 </button>
                 <button onClick={() => navigatePlannerDays(1)} className={styles.navBtn}>
-                  <span>Suivant</span>
+                  <span>{t.planner.next}</span>
                   <Icon name="arrowRight" size={12} />
                 </button>
               </div>
@@ -5087,7 +5087,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                       className={styles.claimBtn}
                                       onClick={() => claimTask(task.id, day)}
                                     >
-                                      Je prends !
+                                      {t.planner.claimTask}
                                     </button>
                                   )}
                                   {isPartiallyAssigned && !isAssignedToMe && !iAmBusy && (
