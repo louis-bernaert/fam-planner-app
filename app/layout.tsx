@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import "./globals.css";
 import { ThemeProvider } from "./components/ThemeProvider";
+import { LanguageProvider } from "./components/LanguageProvider";
 import { SplashScreen } from "./components/SplashScreen";
 
 export const metadata: Metadata = {
@@ -50,7 +51,9 @@ export default function RootLayout({
       </head>
       <body>
         <SplashScreen />
-        <ThemeProvider>{children}</ThemeProvider>
+        <ThemeProvider>
+          <LanguageProvider>{children}</LanguageProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

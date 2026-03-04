@@ -4,8 +4,10 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import styles from "../settings.module.css";
 import Icon from "../../components/Icon";
+import { useTranslation } from "../../components/LanguageProvider";
 
 export default function NotificationsSettingsPage() {
+  const { t } = useTranslation();
   const [freeTasksNotif, setFreeTasksNotif] = useState(true);
   const [evalNotif, setEvalNotif] = useState(true);
   const [saved, setSaved] = useState(false);
@@ -30,24 +32,24 @@ export default function NotificationsSettingsPage() {
         <Link href="/settings" className={styles.backButtonArrow}>
           <Icon name="arrowLeft" size={20} />
         </Link>
-        <h1 className={styles.pageTitle}>Notifications</h1>
+        <h1 className={styles.pageTitle}>{t.settings.notifications}</h1>
       </div>
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>
           <Icon name="bell" size={18} />
-          Bannières de notification
+          {t.settings.notifBanners}
         </h2>
         <p className={styles.sectionDesc}>
-          Choisissez quelles notifications afficher sur votre écran d&apos;accueil
+          {t.settings.notifDesc}
         </p>
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: '16px', marginTop: '16px' }}>
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
             <div>
-              <div style={{ fontWeight: 500, color: 'var(--color-text)', marginBottom: '4px' }}>Tâches libres</div>
+              <div style={{ fontWeight: 500, color: 'var(--color-text)', marginBottom: '4px' }}>{t.settings.freeTasks}</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                Notification quand des tâches sont libres pour le lendemain
+                {t.settings.freeTasksDesc}
               </div>
             </div>
             <label className={styles.toggleSwitch}>
@@ -62,9 +64,9 @@ export default function NotificationsSettingsPage() {
 
           <div style={{ borderTop: '1px solid var(--color-border)', paddingTop: '16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '16px' }}>
             <div>
-              <div style={{ fontWeight: 500, color: 'var(--color-text)', marginBottom: '4px' }}>Auto-évaluation</div>
+              <div style={{ fontWeight: 500, color: 'var(--color-text)', marginBottom: '4px' }}>{t.settings.evalTasks}</div>
               <div style={{ fontSize: '0.85rem', color: 'var(--color-text-muted)' }}>
-                Notification quand des tâches n&apos;ont pas été auto-évaluées
+                {t.settings.evalTasksDesc}
               </div>
             </div>
             <label className={styles.toggleSwitch}>
@@ -82,7 +84,7 @@ export default function NotificationsSettingsPage() {
       <div className={styles.actions}>
         <button type="button" className={styles.primaryBtn} onClick={handleSave}>
           <Icon name="check" size={16} />
-          {saved ? "Enregistré !" : "Enregistrer les préférences"}
+          {saved ? t.common.saved : t.common.save}
         </button>
       </div>
     </div>

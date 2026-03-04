@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import styles from "./points.module.css";
 import Icon from "../../components/Icon";
+import { useTranslation } from "../../components/LanguageProvider";
 
 interface Family {
   id: string;
@@ -33,6 +34,8 @@ export default function PointsSettingsPage() {
   const [selectedMemberForReset, setSelectedMemberForReset] = useState<{userId: string; name: string} | null>(null);
   const [resetPeriod, setResetPeriod] = useState<ResetPeriod>("this_week");
   const [toast, setToast] = useState<{type: "success" | "error"; text: string} | null>(null);
+
+  const { t } = useTranslation();
 
   useEffect(() => {
     const raw = window.localStorage.getItem("sessionUser");
@@ -96,13 +99,13 @@ export default function PointsSettingsPage() {
               : m
           )
         })));
-        showToast("success", !currentValue ? "Participe au classement" : "Retiré du classement");
+        showToast("success", !currentValue ? t.settings.participatesLeaderboard : t.settings.removedLeaderboard);
       } else {
-        showToast("error", "Erreur lors de la mise à jour");
+        showToast("error", t.settings.updateError);
       }
     } catch (error) {
       console.error("Failed to update participation", error);
-      showToast("error", "Erreur lors de la mise à jour");
+      showToast("error", t.settings.updateError);
     } finally {
       setSaving(false);
     }
@@ -129,13 +132,13 @@ export default function PointsSettingsPage() {
               : m
           )
         })));
-        showToast("success", !currentValue ? "Participe à l'auto-attribution" : "Retiré de l'auto-attribution");
+        showToast("success", !currentValue ? t.settings.participatesAutoAssign : t.settings.removedAutoAssign);
       } else {
-        showToast("error", "Erreur lors de la mise à jour");
+        showToast("error", t.settings.updateError);
       }
     } catch (error) {
       console.error("Failed to update auto-assign participation", error);
-      showToast("error", "Erreur lors de la mise à jour");
+      showToast("error", t.settings.updateError);
     } finally {
       setSaving(false);
     }
@@ -159,13 +162,13 @@ export default function PointsSettingsPage() {
         setFamilies(prev => prev.map(f =>
           f.id === currentFamily.id ? { ...f, pointDebtEnabled: newValue } : f
         ));
-        showToast("success", newValue ? "Dette de points activée" : "Dette de points désactivée");
+        showToast("success", newValue ? t.settings.pointDebtActivated : t.settings.pointDebtDeactivated);
       } else {
-        showToast("error", "Erreur lors de la mise à jour");
+        showToast("error", t.settings.updateError);
       }
     } catch (error) {
       console.error("Failed to toggle point debt", error);
-      showToast("error", "Erreur lors de la mise à jour");
+      showToast("error", t.settings.updateError);
     } finally {
       setSaving(false);
     }
@@ -199,14 +202,14 @@ export default function PointsSettingsPage() {
 
       if (res.ok) {
         const data = await res.json();
-        showToast("success", `${data.deletedCount} point(s) supprimé(s)`);
+        showToast("success", `${data.deletedCount} ${t.settings.pointsDeleted}`);
         closeResetModal();
       } else {
-        showToast("error", "Erreur lors de la réinitialisation");
+        showToast("error", t.settings.resetError);
       }
     } catch (error) {
       console.error("Failed to reset points", error);
-      showToast("error", "Erreur lors de la réinitialisation");
+      showToast("error", t.settings.resetError);
     } finally {
       setSaving(false);
     }
@@ -218,13 +221,13 @@ export default function PointsSettingsPage() {
   };
 
   const periodOptions: { value: ResetPeriod; label: string; full?: boolean }[] = [
-    { value: "today", label: "Aujourd'hui" },
-    { value: "yesterday", label: "Hier" },
-    { value: "this_week", label: "Cette semaine" },
-    { value: "last_week", label: "Semaine dernière" },
-    { value: "this_month", label: "Ce mois" },
-    { value: "last_month", label: "Mois dernier" },
-    { value: "all_time", label: "Tout réinitialiser", full: true },
+    { value: "today", label: t.settings.today },
+    { value: "yesterday", label: t.settings.yesterday },
+    { value: "this_week", label: t.settings.thisWeek },
+    { value: "last_week", label: t.settings.lastWeek },
+    { value: "this_month", label: t.settings.thisMonth },
+    { value: "last_month", label: t.settings.lastMonth },
+    { value: "all_time", label: t.settings.resetAll, full: true },
   ];
 
   if (loading) {
@@ -235,7 +238,7 @@ export default function PointsSettingsPage() {
             <Link href="/settings" className={styles.backBtn}>
               <Icon name="arrowLeft" size={16} />
             </Link>
-            <h1 className={styles.headerTitle}>Réglages des points</h1>
+            <h1 className={styles.headerTitle}>{t.settings.pointsSettings}</h1>
           </div>
         </header>
         <div className={styles.loading}>
@@ -253,7 +256,7 @@ export default function PointsSettingsPage() {
             <Link href="/settings" className={styles.backBtn}>
               <Icon name="arrowLeft" size={16} />
             </Link>
-            <h1 className={styles.headerTitle}>Réglages des points</h1>
+            <h1 className={styles.headerTitle}>{t.settings.pointsSettings}</h1>
           </div>
         </header>
         <div className={styles.content}>
@@ -261,7 +264,7 @@ export default function PointsSettingsPage() {
             <div className={styles.emptyIcon}>
               <Icon name="user" size={48} />
             </div>
-            <p>Connectez-vous pour accéder aux réglages</p>
+            <p>{t.settings.connectForSettings}</p>
           </div>
         </div>
       </div>
@@ -276,7 +279,7 @@ export default function PointsSettingsPage() {
           <Link href="/settings" className={styles.backBtn}>
             <Icon name="arrowLeft" size={16} />
           </Link>
-          <h1 className={styles.headerTitle}>Réglages des points</h1>
+          <h1 className={styles.headerTitle}>{t.settings.pointsSettings}</h1>
         </div>
       </header>
 
@@ -304,8 +307,8 @@ export default function PointsSettingsPage() {
               <Icon name="trophy" size={22} />
             </div>
             <div className={styles.sectionInfo}>
-              <h2>Classement</h2>
-              <p>Choisissez qui participe au classement par points</p>
+              <h2>{t.settings.leaderboard}</h2>
+              <p>{t.settings.leaderboardDesc}</p>
             </div>
           </div>
           
@@ -334,8 +337,8 @@ export default function PointsSettingsPage() {
               <Icon name="calendar" size={22} />
             </div>
             <div className={styles.sectionInfo}>
-              <h2>Auto-attribution</h2>
-              <p>Choisissez qui participe à l'auto-attribution des tâches</p>
+              <h2>{t.settings.autoAssign}</h2>
+              <p>{t.settings.autoAssignDesc}</p>
             </div>
           </div>
 
@@ -364,15 +367,15 @@ export default function PointsSettingsPage() {
               <Icon name="chartBar" size={22} />
             </div>
             <div className={styles.sectionInfo}>
-              <h2>Dette de points</h2>
-              <p>Compense les déséquilibres des semaines précédentes lors de l&apos;auto-attribution</p>
+              <h2>{t.settings.pointDebt}</h2>
+              <p>{t.settings.pointDebtDesc}</p>
             </div>
           </div>
 
           <div className={styles.memberList}>
             <div className={styles.memberItem}>
               <span className={styles.memberName}>
-                {currentFamily?.pointDebtEnabled ? "Activée — les semaines passées influencent l'attribution" : "Désactivée — chaque semaine repart à zéro"}
+                {currentFamily?.pointDebtEnabled ? t.settings.pointDebtEnabled : t.settings.pointDebtDisabled}
               </span>
               <label className={styles.toggle}>
                 <input
@@ -394,8 +397,8 @@ export default function PointsSettingsPage() {
               <Icon name="refresh" size={22} />
             </div>
             <div className={styles.sectionInfo}>
-              <h2>Réinitialiser</h2>
-              <p>Remettez les points d'un membre à zéro</p>
+              <h2>{t.settings.reset}</h2>
+              <p>{t.settings.resetDesc}</p>
             </div>
           </div>
           
@@ -409,7 +412,7 @@ export default function PointsSettingsPage() {
                   disabled={saving}
                 >
                   <Icon name="refresh" size={14} />
-                  Réinitialiser
+                  {t.settings.reset}
                 </button>
               </div>
             ))}
@@ -430,7 +433,7 @@ export default function PointsSettingsPage() {
         <div className={styles.modalOverlay} onClick={closeResetModal}>
           <div className={styles.modal} onClick={e => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3 className={styles.modalTitle}>Réinitialiser les points</h3>
+              <h3 className={styles.modalTitle}>{t.settings.resetPoints}</h3>
               <button className={styles.modalClose} onClick={closeResetModal}>
                 <Icon name="x" size={18} />
               </button>
@@ -438,7 +441,7 @@ export default function PointsSettingsPage() {
             
             <div className={styles.modalBody}>
               <p className={styles.modalSubtitle}>
-                Supprimer les points de <strong>{selectedMemberForReset.name}</strong> pour :
+                {t.settings.deletePointsFor} <strong>{selectedMemberForReset.name}</strong> {t.settings.for}
               </p>
               
               <div className={styles.periodGrid}>
@@ -465,21 +468,21 @@ export default function PointsSettingsPage() {
               <div className={styles.warningBox}>
                 <Icon name="alertTriangle" size={18} className={styles.warningIcon} />
                 <span className={styles.warningText}>
-                  Cette action est irréversible. Les validations de tâches seront supprimées.
+                  {t.settings.warningIrreversible}
                 </span>
               </div>
             </div>
             
             <div className={styles.modalFooter}>
               <button className={styles.btnCancel} onClick={closeResetModal}>
-                Annuler
+                {t.common.cancel}
               </button>
               <button 
                 className={styles.btnDanger} 
                 onClick={confirmReset}
                 disabled={saving}
               >
-                {saving ? "Suppression..." : "Confirmer"}
+                {saving ? t.settings.deleting : t.common.confirm}
               </button>
             </div>
           </div>

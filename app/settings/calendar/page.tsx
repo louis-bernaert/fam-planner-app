@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import styles from "../settings.module.css";
 import plannerStyles from "../../planner/page.module.css";
 import Icon from "../../components/Icon";
+import { useTranslation } from "../../components/LanguageProvider";
 
 type CalendarMember = {
   id: string;
@@ -15,6 +16,7 @@ type CalendarMember = {
 };
 
 export default function CalendarSettingsPage() {
+  const { t } = useTranslation();
   const [calendarMembers, setCalendarMembers] = useState<CalendarMember[]>([]);
   const [selectedFamily, setSelectedFamily] = useState<string>("");
   const [isLoading, setIsLoading] = useState(true);
@@ -91,8 +93,8 @@ export default function CalendarSettingsPage() {
     return (
       <div className={styles.container}>
         <div className={styles.header}>
-          <h1>Paramètres du calendrier</h1>
-          <p className={styles.subtitle}>Chargement...</p>
+          <h1>{t.settings.calendarSettings}</h1>
+          <p className={styles.subtitle}>{t.common.loading}</p>
         </div>
       </div>
     );
@@ -105,7 +107,7 @@ export default function CalendarSettingsPage() {
           <Link href="/settings" className={styles.backButtonArrow}>
             <Icon name="arrowLeft" size={20} />
           </Link>
-          <h1 className={styles.pageTitle}>Paramètres du calendrier</h1>
+          <h1 className={styles.pageTitle}>{t.settings.calendarSettings}</h1>
         </div>
       </div>
     );
@@ -117,12 +119,12 @@ export default function CalendarSettingsPage() {
         <Link href="/settings" className={styles.backButtonArrow}>
           <Icon name="arrowLeft" size={20} />
         </Link>
-        <h1 className={styles.pageTitle}>Paramètres du calendrier</h1>
+        <h1 className={styles.pageTitle}>{t.settings.calendarSettings}</h1>
       </div>
 
       <div className={styles.section}>
         {calendarMembers.length === 0 ? (
-          <p className={styles.mutedSmall}>Aucun membre trouvé dans cette famille.</p>
+          <p className={styles.mutedSmall}>{t.settings.noMemberFound}</p>
         ) : (
           <div className={plannerStyles.memberSettings} style={{ padding: 0 }}>
             <div className={plannerStyles.memberSettingsList}>
@@ -145,7 +147,7 @@ export default function CalendarSettingsPage() {
                         updateMemberLocalState(member.id, "color", e.target.value);
                         updateMemberCalendarSettings(member.membershipId, e.target.value, member.calendarUrl || undefined);
                       }}
-                      title="Couleur du membre"
+                      title={t.settings.memberColor}
                       className={plannerStyles.hiddenColorInput}
                     />
                   </label>
@@ -153,10 +155,10 @@ export default function CalendarSettingsPage() {
                 </div>
                 <div className={plannerStyles.memberInputs}>
                   <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-                    <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: 2 }}>Lien iCal du membre</span>
+                    <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: 2 }}>{t.settings.icalLink}</span>
                     <input
                       type="text"
-                      placeholder="URL iCal (webcal://...)"
+                      placeholder={t.settings.icalPlaceholder}
                       value={member.calendarUrl || ""}
                       onChange={(e) => updateMemberLocalState(member.id, "calendarUrl", e.target.value)}
                       className={plannerStyles.calendarUrlInput}
@@ -173,25 +175,25 @@ export default function CalendarSettingsPage() {
                         updateMemberLocalState(member.id, "calendarUrl", text);
                       } catch (err) {
                         console.error("Failed to paste:", err);
-                        const manualText = prompt("Collez l'URL iCal ici:");
+                        const manualText = prompt(t.settings.pasteIcalHere);
                         if (manualText) {
                           updateMemberLocalState(member.id, "calendarUrl", manualText);
                         }
                       }
                     }}
-                    title="Coller depuis le presse-papiers"
+                    title={t.settings.pasteFromClipboard}
                   >
-                    <Icon name="paste" size={12} style={{ marginRight: '4px' }} />Coller
+                    <Icon name="paste" size={12} style={{ marginRight: '4px' }} />{t.common.paste}
                   </button>
                   <button
                     type="button"
                     className={plannerStyles.saveBtn}
                     onClick={() => {
                       updateMemberCalendarSettings(member.membershipId, member.color, member.calendarUrl || undefined);
-                      alert("URL sauvegardée !");
+                      alert(t.settings.urlSaved);
                     }}
                   >
-                    <Icon name="circleCheck" size={12} style={{ marginRight: '4px' }} />Sauvegarder
+                    <Icon name="circleCheck" size={12} style={{ marginRight: '4px' }} />{t.common.save2}
                   </button>
                 </div>
               </div>
@@ -199,12 +201,12 @@ export default function CalendarSettingsPage() {
           </div>
 
           <div className={plannerStyles.helpBox}>
-            <strong>Comment obtenir l'URL iCal d'Apple Calendar ?</strong>
+            <strong>{t.settings.howToGetIcal}</strong>
             <ol>
-              <li>Ouvrez Apple Calendar sur Mac ou iCloud.com</li>
-              <li>Clic droit sur le calendrier → Partager le calendrier</li>
-              <li>Cochez "Calendrier public" et copiez l'URL</li>
-              <li>Collez l'URL ici (commence par webcal:// ou https://)</li>
+              <li>{t.settings.icalStep1}</li>
+              <li>{t.settings.icalStep2}</li>
+              <li>{t.settings.icalStep3}</li>
+              <li>{t.settings.icalStep4}</li>
             </ol>
           </div>
         </div>

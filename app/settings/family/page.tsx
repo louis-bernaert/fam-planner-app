@@ -4,12 +4,13 @@ import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import styles from "../settings.module.css";
 import Icon from "../../components/Icon";
+import { useTranslation } from "../../components/LanguageProvider";
 
 function makeFullName(first?: string, last?: string, fallback?: string) {
   if (first && last) return `${first} ${last}`;
   if (first) return first;
   if (last) return last;
-  return fallback ?? "Utilisateur";
+  return fallback ?? "User";
 }
 
 export default function FamilySettingsPage() {
@@ -38,6 +39,8 @@ export default function FamilySettingsPage() {
     familyId: string;
     familyName: string;
   } | null>(null);
+
+  const { t } = useTranslation();
 
   useEffect(() => {
     const stored = localStorage.getItem("sessionUser");
@@ -176,13 +179,13 @@ export default function FamilySettingsPage() {
             setFamilies((prev) => [...prev, data.family]);
           }
           setSelectedFamily(data.family.id);
-          setParamMessage("Famille rejointe avec succès !");
+          setParamMessage(t.settings.joinedSuccess);
         }
       } else {
-        setParamMessage("Code invalide ou famille introuvable.");
+        setParamMessage(t.settings.invalidCode);
       }
     } catch (err) {
-      setParamMessage("Erreur lors de la tentative.");
+      setParamMessage(t.settings.joinAttemptError);
     }
     setJoinFamilyCode("");
   };
@@ -207,11 +210,11 @@ export default function FamilySettingsPage() {
 
   const addUser = async () => {
     if (!newUserEmail.trim()) {
-      setAddUserMessage("Email requis");
+      setAddUserMessage(t.planner.emailRequired);
       return;
     }
     if (!selectedFamily) {
-      setAddUserMessage("Sélectionnez une famille");
+      setAddUserMessage(t.planner.selectFamily);
       return;
     }
     setAddUserMessage("");
@@ -242,13 +245,13 @@ export default function FamilySettingsPage() {
         setNewUserFirst("");
         setNewUserLast("");
         setNewUserEmail("");
-        setAddUserMessage("Membre ajouté avec succès !");
+        setAddUserMessage(t.settings.addedSuccess);
       } else {
         const errorData = await res.json();
-        setAddUserMessage(errorData.error || "Erreur lors de l'ajout");
+        setAddUserMessage(errorData.error || t.settings.addError);
       }
     } catch (err) {
-      setAddUserMessage("Erreur lors de l'ajout");
+      setAddUserMessage(t.settings.addError);
     }
   };
 
@@ -279,7 +282,7 @@ export default function FamilySettingsPage() {
         );
       } else {
         const errorData = await res.json();
-        alert(errorData.error || "Erreur lors de la modification du rôle");
+        alert(errorData.error || t.settings.roleError);
       }
     } catch (err) {
       console.error("Failed to update role", err);
@@ -320,7 +323,7 @@ export default function FamilySettingsPage() {
         setMemberToKick(null);
       } else {
         const errorData = await res.json();
-        alert(errorData.error || "Erreur lors de l'exclusion");
+        alert(errorData.error || t.settings.kickError);
         setMemberToKick(null);
       }
     } catch (err) {
@@ -335,12 +338,12 @@ export default function FamilySettingsPage() {
         <Link href="/settings" className={styles.backButtonArrow}>
           <Icon name="arrowLeft" size={20} />
         </Link>
-        <h1 className={styles.pageTitle}>Réglages famille</h1>
+        <h1 className={styles.pageTitle}>{t.settings.familySettings}</h1>
       </div>
 
       {/* Current Family Section */}
       <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Famille actuelle</h3>
+        <h3 className={styles.sectionTitle}>{t.settings.currentFamily}</h3>
         
         {families.length > 0 ? (
           <div className={styles.inlineForm}>
@@ -353,42 +356,42 @@ export default function FamilySettingsPage() {
                 <option key={f.id} value={f.id}>{f.name}</option>
               ))}
             </select>
-            <button onClick={leaveFamily} disabled={!currentFamily}>Quitter</button>
+            <button onClick={leaveFamily} disabled={!currentFamily}>{t.common.leave}</button>
           </div>
         ) : (
-          <p className={styles.mutedSmall}>Aucune famille</p>
+          <p className={styles.mutedSmall}>{t.settings.noFamily}</p>
         )}
         
         <div className={styles.divider} />
         
-        <label className={styles.label}>Rejoindre une famille par code</label>
+        <label className={styles.label}>{t.settings.joinByCode}</label>
         <div className={styles.inlineForm}>
           <input
             value={joinFamilyCode}
             onChange={(e) => setJoinFamilyCode(e.target.value)}
-            placeholder="Code de la famille"
+            placeholder={t.settings.familyCode}
           />
-          <button onClick={joinFamilyByCode}>Rejoindre</button>
+          <button onClick={joinFamilyByCode}>{t.common.join}</button>
         </div>
         {paramMessage && <p className={styles.mutedSmall}>{paramMessage}</p>}
       </div>
 
       {/* Create Family Section */}
       <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Créer une famille</h3>
+        <h3 className={styles.sectionTitle}>{t.settings.createFamily}</h3>
         <div className={styles.inlineForm}>
           <input
             value={newFamilyName}
             onChange={(e) => setNewFamilyName(e.target.value)}
-            placeholder="Nom de famille"
+            placeholder={t.settings.familyName}
           />
-          <button onClick={addFamily}>Créer</button>
+          <button onClick={addFamily}>{t.common.create}</button>
         </div>
       </div>
 
       {/* Family List Section */}
       <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Familles créées</h3>
+        <h3 className={styles.sectionTitle}>{t.settings.createdFamilies}</h3>
         <div className={styles.listBox}>
           {families.map((f) => {
             const familyMembers = users.filter((u) => u.familyId === f.id);
@@ -404,33 +407,33 @@ export default function FamilySettingsPage() {
                         value={editFamilyName}
                         onChange={(e) => setEditFamilyName(e.target.value)}
                         className={styles.input}
-                        placeholder="Nom de famille"
+                        placeholder={t.settings.familyName}
                       />
                       <div className={styles.rowActions}>
-                        <button className={styles.smallButton} onClick={saveEditFamily}>Enregistrer</button>
-                        <button className={styles.smallGhost} onClick={() => setEditFamilyId("")}>Annuler</button>
+                        <button className={styles.smallButton} onClick={saveEditFamily}>{t.common.save2}</button>
+                        <button className={styles.smallGhost} onClick={() => setEditFamilyId("")}>{t.common.cancel}</button>
                       </div>
                     </>
                   ) : (
                     <>
                       <div>
                         <strong>{f.name}</strong>
-                        <p className={styles.mutedSmall}>Code: {f.code}</p>
+                        <p className={styles.mutedSmall}>{t.settings.code}: {f.code}</p>
                       </div>
                       <div className={styles.rowActions}>
                         <button
                           className={`${styles.smallButton} ${styles.iconOnly}`}
                           onClick={() => startEditFamily(f.id)}
-                          aria-label="Modifier"
-                          title="Modifier"
+                          aria-label={t.common.edit}
+                          title={t.common.edit}
                         >
                           <Icon name="pen" size={12} />
                         </button>
                         <button
                           className={`${styles.smallGhost} ${styles.iconOnly}`}
                           onClick={() => deleteFamily(f.id)}
-                          aria-label="Supprimer"
-                          title="Supprimer"
+                          aria-label={t.common.delete}
+                          title={t.common.delete}
                         >
                           <Icon name="trash" size={12} />
                         </button>
@@ -441,7 +444,7 @@ export default function FamilySettingsPage() {
                 {!editFamilyId || editFamilyId !== f.id ? (
                   <div className={styles.familyMembers}>
                     {familyMembers.length === 0 ? (
-                      <p className={styles.mutedSmall}>Aucun membre</p>
+                      <p className={styles.mutedSmall}>{t.settings.noMember}</p>
                     ) : (
                       familyMembers.map((member) => {
                         const membership = f.members?.find(
@@ -461,13 +464,13 @@ export default function FamilySettingsPage() {
                         return (
                           <div key={member.id} className={styles.memberChip}>
                             {makeFullName(member.firstName, member.lastName, member.name)}
-                            {isMemberAdmin && <span className={styles.adminBadge}>(admin)</span>}
+                            {isMemberAdmin && <span className={styles.adminBadge}>{t.settings.admin}</span>}
                             {canToggleAdmin && (
                               <button
                                 className={styles.kickButton}
                                 onClick={() => toggleAdminRole(membershipId, memberRole || "member", f.id)}
-                                aria-label={isMemberAdmin ? "Révoquer admin" : "Nommer admin"}
-                                title={isMemberAdmin ? "Révoquer admin" : "Nommer admin"}
+                                aria-label={isMemberAdmin ? t.settings.revokeAdmin : t.settings.makeAdmin}
+                                title={isMemberAdmin ? t.settings.revokeAdmin : t.settings.makeAdmin}
                                 style={isMemberAdmin ? { color: 'var(--color-primary, #3b82f6)' } : undefined}
                               >
                                 <Icon name="star" size={10} />
@@ -484,8 +487,8 @@ export default function FamilySettingsPage() {
                                     familyName: f.name,
                                   })
                                 }
-                                aria-label="Exclure"
-                                title="Exclure de la famille"
+                                aria-label={t.settings.kick}
+                                title={t.settings.kick}
                               >
                                 <Icon name="xmark" size={10} />
                               </button>
@@ -499,33 +502,33 @@ export default function FamilySettingsPage() {
               </div>
             );
           })}
-          {families.length === 0 && <p className={styles.mutedSmall}>Aucune famille.</p>}
+          {families.length === 0 && <p className={styles.mutedSmall}>{t.settings.noFamilyYet}</p>}
         </div>
       </div>
 
       {/* Add Member Section */}
       <div className={styles.section}>
-        <h3 className={styles.sectionTitle}>Ajouter un membre existant</h3>
+        <h3 className={styles.sectionTitle}>{t.settings.addExistingMember}</h3>
         <p className={styles.mutedSmall} style={{ marginBottom: 'var(--space-3)' }}>
-          Ajoutez un utilisateur existant à la famille sélectionnée (email requis).
+          {t.settings.addExistingMemberDesc}
         </p>
         <div className={styles.inlineForm}>
           <input
             value={newUserFirst}
             onChange={(e) => setNewUserFirst(e.target.value)}
-            placeholder="Prénom"
+            placeholder={t.settings.firstName}
           />
           <input
             value={newUserLast}
             onChange={(e) => setNewUserLast(e.target.value)}
-            placeholder="Nom"
+            placeholder={t.settings.lastName}
           />
           <input
             value={newUserEmail}
             onChange={(e) => setNewUserEmail(e.target.value)}
-            placeholder="Email (utilisateur existant)"
+            placeholder={t.settings.emailExisting}
           />
-          <button onClick={addUser}>Ajouter</button>
+          <button onClick={addUser}>{t.common.add}</button>
         </div>
         {addUserMessage && <p className={styles.mutedSmall}>{addUserMessage}</p>}
       </div>
@@ -535,23 +538,22 @@ export default function FamilySettingsPage() {
         <div className={styles.modalOverlay} onClick={() => setMemberToKick(null)}>
           <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div className={styles.modalHeader}>
-              <h3>Exclure un membre</h3>
+              <h3>{t.settings.kickMember}</h3>
               <button className={styles.modalClose} onClick={() => setMemberToKick(null)}>
                 <Icon name="xmark" size={16} />
               </button>
             </div>
             <div className={styles.modalBody}>
               <p>
-                Voulez-vous vraiment exclure <strong>{memberToKick.name}</strong> de la
-                famille <strong>{memberToKick.familyName}</strong> ?
+                {t.settings.kickConfirm} <strong>{memberToKick.name}</strong> {t.settings.fromFamily} <strong>{memberToKick.familyName}</strong> ?
               </p>
             </div>
             <div className={styles.modalFooter}>
               <button className={styles.btnSecondary} onClick={() => setMemberToKick(null)}>
-                Annuler
+                {t.common.cancel}
               </button>
               <button className={styles.btnDanger} onClick={kickMember}>
-                Exclure
+                {t.settings.kick}
               </button>
             </div>
           </div>

@@ -4,7 +4,7 @@ export async function GET() {
   const clientId = process.env.GOOGLE_CLIENT_ID;
   if (!clientId) {
     return NextResponse.json(
-      { error: "Google OAuth non configuré" },
+      { error: "Google OAuth not configured" },
       { status: 500 }
     );
   }

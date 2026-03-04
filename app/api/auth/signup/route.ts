@@ -8,12 +8,12 @@ export async function POST(request: Request) {
     const { email, password, name } = body ?? {};
 
     if (!email || !password || !name) {
-      return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
     const existing = await prisma.user.findUnique({ where: { email: email.toLowerCase() } });
     if (existing) {
-      return NextResponse.json({ error: "Un compte existe déjà avec cet email" }, { status: 409 });
+      return NextResponse.json({ error: "An account already exists with this email" }, { status: 409 });
     }
 
     const hash = await bcrypt.hash(password, 10);
@@ -38,6 +38,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ user: cleanUser });
   } catch (error) {
     console.error("/api/auth/signup error", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

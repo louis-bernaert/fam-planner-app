@@ -96,7 +96,7 @@ export async function PUT(req: NextRequest) {
 
     if (!requesterMembership) {
       return NextResponse.json(
-        { error: "Seuls les administrateurs peuvent modifier les rôles" },
+        { error: "Only administrators can modify roles" },
         { status: 403 }
       );
     }

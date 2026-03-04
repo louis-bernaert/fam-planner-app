@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 import { Icon } from "../components/Icon";
+import { useTranslation } from "../components/LanguageProvider";
 import { solveMILP } from "@/lib/autoAssignSolver";
 import type { SolverTaskDay, SolverCostEntry, SolverRotationEntry, SolverMember } from "@/lib/autoAssignSolver.types";
 
@@ -98,24 +99,9 @@ type NormalizedCost = {
   durRel: number;
 };
 
-const features = [
-  {
-    title: "Tâches pondérées",
-    text: "Temps, pénibilité et indice calculé automatiquement pour équilibrer la charge.",
-    icon: "fa-balance-scale",
-  },
-  {
-    title: "Disponibilités incluses",
-    text: "Chaque membre indique ses créneaux d'absence pour éviter les conflits.",
-    icon: "fa-calendar-check",
-  },
-  {
-    title: "Attribution intelligente",
-    text: "Assignation manuelle ou auto, en gardant l'équité et une part d'aléatoire.",
-    icon: "fa-random",
-  },
-];
+// features array is now defined inside PlannerPage so it can use translations
 
+// Internal DB values — always French (stored in database)
 const daySlots = [
   "Lun · Matin",
   "Lun · Soir",
@@ -135,22 +121,64 @@ const daySlots = [
 
 const dayOptions = ["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"];
 
+const timeSlotOptions = ["Matin", "Après-midi", "Soir"];
+
 function uuid() {
   return crypto.randomUUID();
 }
 
-function makeFullName(first?: string, last?: string, fallback?: string) {
+function makeFullName(first?: string, last?: string, fallback?: string, defaultLabel: string = "User") {
   const f = (first ?? "").trim();
   const l = (last ?? "").trim();
   const combined = [f, l].filter(Boolean).join(" ");
   if (combined) return combined;
   if (fallback?.trim()) return fallback.trim();
-  return "Utilisateur";
+  return defaultLabel;
 }
 
 export default function PlannerPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t, language } = useTranslation();
+  const locale = language === 'fr' ? 'fr-FR' : 'en-US';
+
+  // Translation helpers for slot display (DB stores French values, we translate for display)
+  const dayTranslationMap: Record<string, string> = {
+    'Lun': t.days.mon, 'Mar': t.days.tue, 'Mer': t.days.wed,
+    'Jeu': t.days.thu, 'Ven': t.days.fri, 'Sam': t.days.sat, 'Dim': t.days.sun,
+  };
+  const timeTranslationMap: Record<string, string> = {
+    'Matin': t.timeSlots.morning, 'Après-midi': t.timeSlots.afternoon,
+    'Soir': t.timeSlots.evening, 'Journée': t.timeSlots.allDay,
+  };
+  const translateDay = (day: string): string => dayTranslationMap[day] || day;
+  const translateTime = (time: string): string => timeTranslationMap[time] || time;
+  const translateSlot = (slot: string): string => {
+    const parts = slot.split(' · ');
+    if (parts.length === 2) {
+      return `${translateDay(parts[0])} · ${translateTime(parts[1])}`;
+    }
+    return translateDay(slot);
+  };
+
+  const features = [
+    {
+      title: t.planner.weightedTasks,
+      text: t.planner.weightedTasksDesc,
+      icon: "fa-balance-scale",
+    },
+    {
+      title: t.planner.availabilityIncluded,
+      text: t.planner.availabilityIncludedDesc,
+      icon: "fa-calendar-check",
+    },
+    {
+      title: t.planner.smartAssignment,
+      text: t.planner.smartAssignmentDesc,
+      icon: "fa-random",
+    },
+  ];
+
   const [families, setFamilies] = useState<Family[]>([]);
 
   const [users, setUsers] = useState<User[]>([]);
@@ -378,11 +406,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   }, [toastMessage]);
 
   const tabs = [
-    { id: "monespace" as const, label: "Mon Espace", shortLabel: "Accueil", icon: "home" as const },
-    { id: "planificateur" as const, label: "Planificateur", shortLabel: "Planning", icon: "calendarAlt" as const },
-    { id: "points" as const, label: "Compteur de points", shortLabel: "Points", icon: "chartBar" as const },
-    { id: "taches" as const, label: "Tâches", shortLabel: "Tâches", icon: "clipboardList" as const },
-    { id: "dispos" as const, label: "Calendrier", shortLabel: "Agenda", icon: "calendar" as const },
+    { id: "monespace" as const, label: t.tabs.mySpace, shortLabel: t.tabs.mySpaceShort, icon: "home" as const },
+    { id: "planificateur" as const, label: t.tabs.planner, shortLabel: t.tabs.plannerShort, icon: "calendarAlt" as const },
+    { id: "points" as const, label: t.tabs.points, shortLabel: t.tabs.pointsShort, icon: "chartBar" as const },
+    { id: "taches" as const, label: t.tabs.tasks, shortLabel: t.tabs.tasksShort, icon: "clipboardList" as const },
+    { id: "dispos" as const, label: t.tabs.calendar, shortLabel: t.tabs.calendarShort, icon: "calendar" as const },
   ];
 
   // Calendar functions
@@ -396,7 +424,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       const endRecur = evt.recurrenceEnd ? (() => { const [ey, em, ed] = evt.recurrenceEnd.split("-").map(Number); return new Date(ey, em - 1, ed); })() : null;
       const member = members.find((mb: any) => mb.userId === evt.userId);
       const color = member?.color || "#3b82f6";
-      const userName = evt.user?.name || "Inconnu";
+      const userName = evt.user?.name || t.planner.unknownUser;
 
       if (evt.recurrence === "none") {
         if (baseDate >= rangeStart && baseDate <= rangeEnd) {
@@ -589,11 +617,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       } else {
         const errorData = await res.json();
         console.error("Failed to save:", errorData);
-        alert("Erreur lors de la sauvegarde: " + (errorData.error || "Erreur inconnue"));
+        alert(t.planner.saveError + ": " + (errorData.error || t.common.error));
       }
     } catch (error) {
       console.error("Failed to update member settings", error);
-      alert("Erreur lors de la sauvegarde");
+      alert(t.planner.saveError);
     }
   };
 
@@ -651,7 +679,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   };
   
   const formatMonthYear = (date: Date) => {
-    return date.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' });
+    return date.toLocaleDateString(locale, { month: 'long', year: 'numeric' });
   };
   
   const navigateMonth = (direction: number) => {
@@ -673,7 +701,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   };
 
   const formatPlannerDate = (date: Date) => {
-    return date.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' });
+    return date.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' });
   };
 
   const getDayOfWeek = (date: Date) => {
@@ -731,9 +759,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
   // Format time for display
   const formatTimeDisplay = (time: string): string => {
-    if (time === '08:00') return 'Matin';
-    if (time === '14:00') return 'Après-midi';
-    if (time === '18:00') return 'Soir';
+    if (time === '08:00') return t.timeSlots.morning;
+    if (time === '14:00') return t.timeSlots.afternoon;
+    if (time === '18:00') return t.timeSlots.evening;
     const { hours } = parseTime(time);
     if (hours < 12) return `🌅 ${time}`;
     if (hours < 18) return `☀️ ${time}`;
@@ -820,12 +848,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         eventEndDate.setHours(0, 0, 0, 0);
         
         if ((checkDate >= eventStartDate && checkDate < eventEndDate) || checkDate.getTime() === eventStartDate.getTime()) {
-          unavailabilities.push({ time: 'Toute la journée', summary: event.title || 'Événement' });
+          unavailabilities.push({ time: t.planner.allDayEvent, summary: event.title || '' });
         }
       } else if (eventStart.toDateString() === date.toDateString()) {
-        const startStr = eventStart.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        const endStr = eventEnd.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-        unavailabilities.push({ time: `${startStr} - ${endStr}`, summary: event.title || 'Événement' });
+        const startStr = eventStart.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        const endStr = eventEnd.toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' });
+        unavailabilities.push({ time: `${startStr} - ${endStr}`, summary: event.title || '' });
       }
     }
     
@@ -840,7 +868,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     if (task) {
       const timeSlot = getTaskTimeSlot(task, date);
       if (isUserBusyAtTime(currentUser, date, timeSlot)) {
-        alert('Vous êtes occupé(e) à cette heure selon votre agenda.');
+        alert(t.planner.youAreBusy);
         return;
       }
     }
@@ -1150,7 +1178,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   // Sauvegarder une évaluation
   const saveEvaluation = async (taskId: string, duration: number, penibility: number) => {
     if (!currentUser) {
-      setToastMessage({ type: 'error', text: 'Vous devez être connecté pour évaluer une tâche' });
+      setToastMessage({ type: 'error', text: t.planner.mustBeLoggedEval });
       return;
     }
 
@@ -1180,10 +1208,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         throw new Error(errorData.error || 'Erreur serveur');
       }
       
-      setToastMessage({ type: 'success', text: 'Évaluation enregistrée !' });
+      setToastMessage({ type: 'success', text: t.planner.evaluationSaved });
     } catch (error: any) {
       console.error('Failed to save evaluation', error);
-      setToastMessage({ type: 'error', text: `Erreur: ${error.message || 'Échec de la sauvegarde'}` });
+      setToastMessage({ type: 'error', text: `${t.common.error}: ${error.message || t.planner.evalSaveFailed}` });
     }
   };
 
@@ -1306,7 +1334,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
   const getUserName = (userId: string) => {
     const user = familyUsers.find(u => u.id === userId);
-    return user?.name || 'Inconnu';
+    return user?.name || t.planner.unknownUser;
   };
 
   // Mon Espace functions
@@ -1601,7 +1629,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           task,
           date: new Date(v.date),
           validation: v,
-          delegatorName: delegator?.name || 'Quelqu\'un'
+          delegatorName: delegator?.name || t.planner.someone
         };
       })
       .filter(Boolean) as { task: Task; date: Date; validation: ValidatedTask; delegatorName: string }[];
@@ -1639,7 +1667,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           task,
           date: new Date(v.date),
           validation: v,
-          delegatorName: delegator?.name || 'Quelqu\'un',
+          delegatorName: delegator?.name || t.planner.someone,
           points: calculateTaskPoints(task)
         };
       })
@@ -1827,15 +1855,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   };
 
   const formatMetricValue = (value: number) => {
-    if (rankingMetric === 'points') return `${value} pts`;
-    if (rankingMetric === 'tasks') return `${value} tâche${value > 1 ? 's' : ''}`;
+    if (rankingMetric === 'points') return `${value} ${t.common.pts}`;
+    if (rankingMetric === 'tasks') return `${value} ${t.common.tasks}`;
     return formatDuration(value);
   };
 
   const formatMetricSubtext = (user: { taskCount: number; time: number; totalPoints: number }) => {
-    if (rankingMetric === 'points') return `${user.taskCount} tâche${user.taskCount > 1 ? 's' : ''} validée${user.taskCount > 1 ? 's' : ''}`;
-    if (rankingMetric === 'tasks') return `${user.totalPoints} pts`;
-    return `${user.taskCount} tâche${user.taskCount > 1 ? 's' : ''}`;
+    if (rankingMetric === 'points') return `${user.taskCount} ${t.common.tasks}`;
+    if (rankingMetric === 'tasks') return `${user.totalPoints} ${t.common.pts}`;
+    return `${user.taskCount} ${t.common.tasks}`;
   };
 
   // Obtenir l'historique détaillé des gains d'un utilisateur
@@ -2175,13 +2203,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             setEditFamilyId("");
             setEditFamilyName("");
           }
-          setParamMessage("Famille supprimée");
+          setParamMessage(t.planner.familyDeleted);
         } else {
-          setParamMessage("Erreur lors de la suppression");
+          setParamMessage(t.planner.deletionError);
         }
       } catch (error) {
         console.error("Failed to delete family", error);
-        setParamMessage("Erreur lors de la suppression");
+        setParamMessage(t.planner.deletionError);
       }
     };
     
@@ -2203,12 +2231,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         setSelectedUser(user.id);
         setSelectedFamily(user.familyIds?.[0] ?? selectedFamily);
         setAuthError("");
-        setAuthMessage(`Connecté avec Google en tant que ${user.name}.`);
+        setAuthMessage(`${t.planner.loggedInAs} ${user.name}.`);
         window.localStorage.setItem("sessionUser", JSON.stringify(user));
         window.history.replaceState({}, "", "/planner");
       } catch (e) {
         console.error("google auth parse", e);
-        setAuthError("Erreur de connexion Google");
+        setAuthError(t.planner.googleError);
       }
     }
 
@@ -2216,12 +2244,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     const errorParam = searchParams?.get("error");
     if (errorParam?.startsWith("google_")) {
       const messages: Record<string, string> = {
-        google_denied: "Connexion Google annulée",
-        google_token: "Erreur d'authentification Google",
-        google_email: "Impossible de récupérer l'email Google",
-        google_server: "Erreur serveur lors de la connexion Google",
+        google_denied: t.planner.googleCancelled,
+        google_token: t.planner.googleError,
+        google_email: t.planner.cannotGetGoogleEmail,
+        google_server: t.planner.googleError,
       };
-      setAuthError(messages[errorParam] || "Erreur de connexion Google");
+      setAuthError(messages[errorParam] || t.planner.googleError);
     }
   }, [searchParams]);
 
@@ -2533,11 +2561,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   function addFamily() {
     setParamMessage("");
     if (!newFamilyName.trim()) {
-      setParamMessage("Nom de famille requis");
+      setParamMessage(t.planner.familyNameRequired);
       return;
     }
     if (!currentUser) {
-      setParamMessage("Vous devez être connecté pour créer une famille");
+      setParamMessage(t.planner.mustBeLoggedFamily);
       return;
     }
     
@@ -2584,14 +2612,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               return prev;
             }
           });
-          setParamMessage("Famille créée avec le code: " + newFamily.code);
+          setParamMessage(t.planner.familyCreatedWithCode + newFamily.code);
         } else {
           const errData = await res.json();
-          setParamMessage("Erreur: " + (errData.error || "Échec de la création"));
+          setParamMessage(t.common.error + ": " + (errData.error || t.planner.familyCreationFailed));
         }
       } catch (error) {
         console.error("Failed to create family", error);
-        setParamMessage("Erreur lors de la création de la famille");
+        setParamMessage(t.planner.familyCreationError);
       }
     };
     
@@ -2601,7 +2629,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   function addUser() {
     setAddUserMessage("");
     if (!newUserEmail.trim()) {
-      setAddUserMessage("Email requis");
+      setAddUserMessage(t.planner.emailRequired);
       return;
     }
     const email = newUserEmail.trim().toLowerCase();
@@ -2613,7 +2641,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     const user = users.find((u) => (u.email ?? "").toLowerCase() === email);
     
     if (!user) {
-      setAddUserMessage("Utilisateur introuvable (vérifiez l'email)");
+      setAddUserMessage(t.planner.userNotFound);
       return;
     }
     
@@ -2644,14 +2672,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 : u
             )
           );
-          setAddUserMessage("Membre ajouté à la famille");
+          setAddUserMessage(t.planner.memberAdded);
           setNewUserFirst("");
           setNewUserLast("");
           setNewUserEmail("");
         }
       } catch (error) {
         console.error("Failed to add user to family", error);
-        setAddUserMessage("Erreur lors de l'ajout du membre");
+        setAddUserMessage(t.planner.addMemberError);
       }
     };
     
@@ -2694,7 +2722,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
   async function createAccount() {
     if (!newAccount.name.trim() || !newAccount.email.trim() || !newAccount.password.trim()) {
-      setAuthError("Nom, email et mot de passe requis");
+      setAuthError(t.planner.nameEmailPasswordRequired);
       return;
     }
     try {
@@ -2710,7 +2738,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
       const data = await res.json();
       if (!res.ok) {
-        setAuthError(data?.error || "Erreur d'inscription");
+        setAuthError(data?.error || t.planner.signupError);
         setAuthMessage("");
         return;
       }
@@ -2721,12 +2749,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       setSelectedUser(user.id);
       setNewAccount({ name: "", email: "", password: "", familyId: selectedFamily });
       setAuthView("login");
-      setAuthMessage("Compte créé et connecté.");
+      setAuthMessage(t.planner.accountCreated);
       setAuthError("");
       window.localStorage.setItem("sessionUser", JSON.stringify(user));
     } catch (error) {
       console.error("signup", error);
-      setAuthError("Erreur réseau");
+      setAuthError(t.planner.networkError);
     }
   }
 
@@ -2734,7 +2762,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     const email = (emailArg ?? authEmail).trim().toLowerCase();
     const pwd = (passwordArg ?? authPassword).trim();
     if (!email || !pwd) {
-      setAuthError("Email et mot de passe requis");
+      setAuthError(t.planner.emailPasswordRequired);
       return;
     }
     try {
@@ -2745,7 +2773,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       });
       const data = await res.json();
       if (!res.ok) {
-        setAuthError(data?.error || "Échec de connexion");
+        setAuthError(data?.error || t.planner.loginFailed);
         setAuthMessage("");
         return;
       }
@@ -2755,11 +2783,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       setSelectedUser(user.id);
       setSelectedFamily(user.familyIds?.[0] ?? selectedFamily);
       setAuthError("");
-      setAuthMessage(`Connecté en tant que ${user.name}.`);
+      setAuthMessage(`${t.planner.loggedInAs} ${user.name}.`);
       window.localStorage.setItem("sessionUser", JSON.stringify(user));
     } catch (error) {
       console.error("login", error);
-      setAuthError("Erreur réseau");
+      setAuthError(t.planner.networkError);
     }
   }
 
@@ -2776,7 +2804,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
   async function forgotPassword() {
     if (!forgotEmail.trim()) {
-      setAuthError("Veuillez entrer votre adresse email");
+      setAuthError(t.planner.emailRequired);
       return;
     }
     setForgotLoading(true);
@@ -2790,13 +2818,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       });
       const data = await res.json();
       if (!res.ok) {
-        setAuthError(data?.error || "Erreur lors de l'envoi");
+        setAuthError(data?.error || t.planner.sendError);
       } else {
-        setAuthMessage("Si un compte existe avec cet email, un lien de réinitialisation a été envoyé.");
+        setAuthMessage(t.planner.resetEmailSent);
         setForgotEmail("");
       }
     } catch {
-      setAuthError("Erreur réseau");
+      setAuthError(t.planner.networkError);
     } finally {
       setForgotLoading(false);
     }
@@ -2809,12 +2837,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   function joinFamilyByName() {
     setParamMessage("");
     if (!joinFamilyName.trim()) {
-      setParamMessage("Nom de famille requis");
+      setParamMessage(t.planner.familyNameRequired);
       return;
     }
     const found = families.find((f) => f.name.toLowerCase() === joinFamilyName.trim().toLowerCase());
     if (!found) {
-      setParamMessage("Famille introuvable");
+      setParamMessage(t.planner.familyNotFound);
       return;
     }
     
@@ -2843,7 +2871,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       joinFamilyInDB();
     } else {
       setSelectedFamily(found.id);
-      setParamMessage("Famille sélectionnée (non connecté)");
+      setParamMessage(t.planner.connectedNotLogged);
       setJoinFamilyName("");
     }
   }
@@ -2851,12 +2879,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   function joinFamilyByCode() {
     setParamMessage("");
     if (!joinFamilyCode.trim()) {
-      setParamMessage("Code de famille requis");
+      setParamMessage(t.planner.familyCodeRequired);
       return;
     }
     
     if (!currentUser) {
-      setParamMessage("Vous devez être connecté");
+      setParamMessage(t.planner.mustBeLogged);
       return;
     }
 
@@ -2884,14 +2912,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           }
           
           setJoinFamilyCode("");
-          setParamMessage("Famille rejointe!");
+          setParamMessage(t.planner.familyJoined);
         } else {
           const data = await res.json();
           setParamMessage(data.error || "Erreur lors de la connexion");
         }
       } catch (error) {
         console.error("Failed to join family by code", error);
-        setParamMessage("Erreur lors de la connexion");
+        setParamMessage(t.planner.joinError);
       }
     };
     joinFamilyInDB();
@@ -2900,7 +2928,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   function leaveFamily() {
     setParamMessage("");
     if (!currentUser || !currentFamily) {
-      setParamMessage("Sélectionnez une famille à quitter");
+      setParamMessage(t.planner.selectFamilyToLeave);
       return;
     }
     
@@ -2918,13 +2946,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           // Sélectionner une autre famille si disponible
           const remainingFamilies = families.filter((f: any) => f.id !== currentFamily);
           setSelectedFamily(remainingFamilies[0]?.id ?? "");
-          setParamMessage("Vous avez quitté la famille");
+          setParamMessage(t.planner.leftFamily);
         } else {
-          setParamMessage("Erreur lors de la suppression");
+          setParamMessage(t.planner.deletionError);
         }
       } catch (error) {
         console.error("Failed to leave family", error);
-        setParamMessage("Erreur lors de la suppression");
+        setParamMessage(t.planner.deletionError);
       }
     };
     
@@ -2942,11 +2970,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
   function addTask() {
     if (!selectedFamily) {
-      setParamMessage("Créez ou rejoignez une famille d'abord pour ajouter des tâches");
+      setParamMessage(t.planner.createOrJoinFamily);
       return;
     }
     if (!newTask.title.trim()) {
-      setParamMessage("Titre de tâche requis");
+      setParamMessage(t.planner.taskTitleRequired);
       return;
     }
     setParamMessage("");
@@ -2990,11 +3018,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           setNewTaskIsRecurring(false);
         } else {
           const errData = await res.json();
-          alert("Erreur: " + (errData.error || "Échec création"));
+          alert(t.common.error + ": " + (errData.error || t.planner.familyCreationFailed));
         }
       } catch (error) {
         console.error("Failed to create task", error);
-        alert("Erreur lors de la création de la tâche");
+        alert(t.planner.taskCreationError);
       }
     };
     
@@ -3016,11 +3044,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           }
         } else {
           const errData = await res.json();
-          alert("Erreur: " + (errData.error || "Échec suppression"));
+          alert(t.common.error + ": " + (errData.error || t.planner.deletionError));
         }
       } catch (error) {
         console.error("Failed to delete task", error);
-        alert("Erreur lors de la suppression");
+        alert(t.planner.deletionError);
       }
     };
     
@@ -3230,11 +3258,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   function saveEditUser() {
     setParamMessage("");
     if (!editUserId) {
-      setParamMessage("Sélectionnez un membre");
+      setParamMessage(t.planner.selectMember);
       return;
     }
     if (!editUserDraft.firstName.trim() || !editUserDraft.lastName.trim()) {
-      setParamMessage("Prénom et nom requis");
+      setParamMessage(t.planner.firstLastRequired);
       return;
     }
     const fullName = makeFullName(editUserDraft.firstName, editUserDraft.lastName, "");
@@ -3275,14 +3303,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               };
             })
           );
-          setParamMessage("Membre mis à jour");
+          setParamMessage(t.planner.memberUpdated);
           setEditUserId("");
         } else {
-          setParamMessage("Erreur lors de la sauvegarde");
+          setParamMessage(t.planner.saveError);
         }
       } catch (error) {
         console.error("Failed to update user", error);
-        setParamMessage("Erreur lors de la mise à jour");
+        setParamMessage(t.planner.updateError);
       }
     };
     
@@ -3320,24 +3348,24 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   function autoAssign() {
     // ===== VÉRIFICATION DES PRÉREQUIS =====
     if (!currentUser) {
-      setToastMessage({ type: 'error', text: 'Vous devez être connecté pour utiliser l\'auto-attribution' });
+      setToastMessage({ type: 'error', text: t.planner.mustBeLogged });
       return;
     }
     
     if (familyUsers.length === 0) {
-      setToastMessage({ type: 'error', text: 'Aucun membre dans la famille. Ajoutez des membres dans les réglages.' });
+      setToastMessage({ type: 'error', text: t.planner.noMembersForAutoAssign });
       return;
     }
 
     // Filtrer les membres qui participent à l'auto-attribution
     const autoAssignUsers = familyUsers.filter(u => u.participatesInAutoAssign !== false);
     if (autoAssignUsers.length === 0) {
-      setToastMessage({ type: 'error', text: 'Aucun membre ne participe à l\'auto-attribution. Modifiez les réglages des points.' });
+      setToastMessage({ type: 'error', text: t.planner.noParticipantsAutoAssign });
       return;
     }
     
     if (familyTasks.length === 0) {
-      setToastMessage({ type: 'error', text: 'Aucune tâche configurée. Créez des tâches dans l\'onglet Tâches.' });
+      setToastMessage({ type: 'error', text: t.planner.noTasksConfigured });
       return;
     }
     
@@ -3437,7 +3465,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     }
 
     if (allUnassignedTasks.length === 0) {
-      setToastMessage({ type: 'error', text: 'Toutes les tâches sont déjà attribuées jusqu\'à dimanche.' });
+      setToastMessage({ type: 'error', text: t.planner.allTasksAssignedUntilSunday });
       return;
     }
 
@@ -3533,14 +3561,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     );
 
     if (!solverResult.feasible) {
-      setToastMessage({ type: 'error', text: 'Le solveur n\'a pas trouvé de solution. Vérifiez les disponibilités des membres.' });
+      setToastMessage({ type: 'error', text: t.planner.solverNoSolution });
       return;
     }
 
     const newAssignments = solverResult.assignments;
 
     if (newAssignments.length === 0) {
-      setToastMessage({ type: 'error', text: 'Impossible d\'attribuer : tous les membres sont indisponibles sur les créneaux restants.' });
+      setToastMessage({ type: 'error', text: t.planner.allMembersUnavailable });
       return;
     }
 
@@ -3576,7 +3604,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       for (const a of newAssignments) {
         const summary = userSummaries.get(a.userId);
         if (summary) {
-          const dayLabel = new Date(a.date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' });
+          const dayLabel = new Date(a.date + 'T00:00:00').toLocaleDateString(locale, { weekday: 'short', day: 'numeric' });
           summary.tasks.push({ title: a.taskTitle, day: dayLabel, points: a.points, reason: a.reason });
           summary.points += a.points;
         }
@@ -3589,12 +3617,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           const fairShare = Math.round(totalAllTasksPoints * (weight / totalWeight));
           const alreadyRegistered = Math.round(registeredPointsByUser.get(userId) || 0);
           const target = Math.max(0, fairShare - alreadyRegistered);
-          details.push(`── ${summary.name} — ${Math.round(summary.points)} pts attribués ──`);
-          details.push(`  Part équitable : ${fairShare} pts (sur ${Math.round(totalAllTasksPoints)} pts total semaine)`);
+          details.push(`── ${summary.name} — ${Math.round(summary.points)} ${t.common.pts} ──`);
+          details.push(`  ${fairShare} ${t.common.pts} / ${Math.round(totalAllTasksPoints)} ${t.common.pts}`);
           if (alreadyRegistered > 0) {
-            details.push(`  Déjà inscrit : -${alreadyRegistered} pts`);
+            details.push(`  -${alreadyRegistered} ${t.common.pts}`);
           }
-          details.push(`  Cible auto-attribution : ${Math.round(target)} pts`);
+          details.push(`  ${Math.round(target)} ${t.common.pts}`);
           summary.tasks.forEach(t => {
             details.push(`  • ${t.title} (${t.day}, ${Math.round(t.points)} pts)`);
             details.push(`    ${t.reason}`);
@@ -3605,7 +3633,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       // Afficher le toast immédiatement
       setToastMessage({
         type: 'success',
-        text: `${newAssignments.length} tâches attribuées jusqu'à dimanche (${Math.round(totalWeeklyPoints)} pts répartis)`,
+        text: `${newAssignments.length} ${t.common.tasks} (${Math.round(totalWeeklyPoints)} ${t.common.pts})`,
         details
       });
 
@@ -3695,15 +3723,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
       let reason = '';
       if (winner.personalCost < 0.3) {
-        reason = 'Trouve cette tâche facile';
+        reason = t.planner.findsTaskEasy;
       } else if (winner.progressivePenalty < 0.1) {
-        reason = 'A de la capacité';
+        reason = t.planner.hasCapacity;
       } else if (winner.rotationCount === 0 && scored.some(s => s.rotationCount > 0)) {
-        reason = 'Rotation (alternance)';
+        reason = t.planner.rotation;
       } else if (winner.personalCost < scored[scored.length - 1]?.personalCost - 0.2) {
-        reason = 'Préfère cette tâche';
+        reason = t.planner.prefersTask;
       } else {
-        reason = 'Équilibrage de charge';
+        reason = t.planner.loadBalancing;
       }
 
       preview.push({
@@ -3732,7 +3760,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             />
             <h1 className={styles.authTitle}>Fam&apos;Planner</h1>
             <p className={styles.authSubtitle}>
-              Organisez votre foyer en toute sérénité
+              {t.planner.organizeHousehold}
             </p>
           </div>
 
@@ -3749,11 +3777,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/>
                   <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/>
                 </svg>
-                Continuer avec Google
+                {t.planner.continueWithGoogle}
               </button>
 
               <div className={styles.authDivider}>
-                <span>ou</span>
+                <span>{t.common.or}</span>
               </div>
             </>
           )}
@@ -3769,7 +3797,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   setAuthError("");
                 }}
               >
-                Connexion
+                {t.planner.login}
               </button>
               <button
                 className={authView === "signup" ? styles.tabActive : styles.tab}
@@ -3779,36 +3807,36 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   setAuthError("");
                 }}
               >
-                Inscription
+                {t.planner.signup}
               </button>
             </div>
           )}
 
           {/* Forgot password header */}
           {authView === "forgot" && (
-            <h2 className={styles.authSectionTitle}>Réinitialisation du mot de passe</h2>
+            <h2 className={styles.authSectionTitle}>{t.planner.resetPasswordTitle}</h2>
           )}
 
           {/* Login form */}
           {authView === "login" && (
             <div className={styles.authForm}>
               <div className={styles.inputGroup}>
-                <label className={styles.label}>Email</label>
+                <label className={styles.label}>{t.planner.email}</label>
                 <input
                   value={authEmail}
                   onChange={(e) => setAuthEmail(e.target.value)}
-                  placeholder="vous@exemple.com"
+                  placeholder={t.planner.emailPlaceholder}
                   type="email"
                 />
               </div>
               <div className={styles.inputGroup}>
-                <label className={styles.label}>Mot de passe</label>
+                <label className={styles.label}>{t.planner.password}</label>
                 <div className={styles.passwordField}>
                   <input
                     type={showPassword ? "text" : "password"}
                     value={authPassword}
                     onChange={(e) => setAuthPassword(e.target.value)}
-                    placeholder="mot de passe"
+                    placeholder={t.planner.passwordPlaceholder}
                   />
                   <button
                     type="button"
@@ -3821,7 +3849,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 </div>
               </div>
               <button className={styles.authSubmitBtn} onClick={() => login()}>
-                Se connecter
+                {t.planner.loginBtn}
               </button>
               <button
                 type="button"
@@ -3832,7 +3860,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   setAuthMessage("");
                 }}
               >
-                Mot de passe oublié ?
+                {t.planner.forgotPassword}
               </button>
             </div>
           )}
@@ -3841,30 +3869,30 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           {authView === "signup" && (
             <div className={styles.authForm}>
               <div className={styles.inputGroup}>
-                <label className={styles.label}>Nom</label>
+                <label className={styles.label}>{t.planner.name}</label>
                 <input
                   value={newAccount.name}
                   onChange={(e) => setNewAccount((a) => ({ ...a, name: e.target.value }))}
-                  placeholder="Votre nom"
+                  placeholder={t.planner.namePlaceholder}
                 />
               </div>
               <div className={styles.inputGroup}>
-                <label className={styles.label}>Email</label>
+                <label className={styles.label}>{t.planner.email}</label>
                 <input
                   value={newAccount.email}
                   onChange={(e) => setNewAccount((a) => ({ ...a, email: e.target.value }))}
-                  placeholder="vous@exemple.com"
+                  placeholder={t.planner.emailPlaceholder}
                   type="email"
                 />
               </div>
               <div className={styles.inputGroup}>
-                <label className={styles.label}>Mot de passe</label>
+                <label className={styles.label}>{t.planner.password}</label>
                 <div className={styles.passwordField}>
                   <input
                     type={showSignupPassword ? "text" : "password"}
                     value={newAccount.password}
                     onChange={(e) => setNewAccount((a) => ({ ...a, password: e.target.value }))}
-                    placeholder="mot de passe"
+                    placeholder={t.planner.passwordPlaceholder}
                   />
                   <button
                     type="button"
@@ -3877,7 +3905,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 </div>
               </div>
               <button className={styles.authSubmitBtn} onClick={createAccount}>
-                Créer mon compte
+                {t.planner.createAccount}
               </button>
             </div>
           )}
@@ -3886,14 +3914,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           {authView === "forgot" && (
             <div className={styles.authForm}>
               <p className={styles.forgotDescription}>
-                Entrez votre adresse email. Si un compte existe, vous recevrez un lien de réinitialisation.
+                {t.planner.resetEmailDesc}
               </p>
               <div className={styles.inputGroup}>
-                <label className={styles.label}>Email</label>
+                <label className={styles.label}>{t.planner.email}</label>
                 <input
                   value={forgotEmail}
                   onChange={(e) => setForgotEmail(e.target.value)}
-                  placeholder="vous@exemple.com"
+                  placeholder={t.planner.emailPlaceholder}
                   type="email"
                 />
               </div>
@@ -3902,7 +3930,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 onClick={forgotPassword}
                 disabled={forgotLoading}
               >
-                {forgotLoading ? "Envoi..." : "Envoyer le lien"}
+                {forgotLoading ? t.planner.sending : t.planner.sendLink}
               </button>
               <button
                 type="button"
@@ -3913,7 +3941,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   setAuthMessage("");
                 }}
               >
-                <Icon name="arrowLeft" size={14} /> Retour à la connexion
+                <Icon name="arrowLeft" size={14} /> {t.planner.backToLogin}
               </button>
             </div>
           )}
@@ -3945,16 +3973,16 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         <section className={styles.tabPanel}>
           <div className={styles.cardPanel}>
             <div className={styles.monEspaceHeader}>
-              <h3><Icon name="user" size={18} style={{ marginRight: '8px' }} />Mon Espace</h3>
+              <h3><Icon name="user" size={18} style={{ marginRight: '8px' }} />{t.tabs.mySpace}</h3>
               <div className={styles.myPointsTotal}>
-                <span className={styles.pointsLabel}>Mes points</span>
+                <span className={styles.pointsLabel}>{t.planner.myPoints}</span>
                 <span className={styles.pointsValue}>{getMyTotalPoints()} pts</span>
               </div>
             </div>
 
             {!currentUser ? (
               <p className={styles.mutedSmall} style={{ color: "#ff6b6b", display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <Icon name="warning" size={14} />Connectez-vous pour voir vos tâches
+                <Icon name="warning" size={14} />{t.planner.connectToSee}
               </p>
             ) : (
               <>
@@ -3964,12 +3992,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     <div className={styles.notifBannerContent}>
                       <Icon name="info" size={16} />
                       <span>
-                        <strong>{getFreeTasksTomorrow().length} tâche{getFreeTasksTomorrow().length > 1 ? 's' : ''}</strong> sans inscrit pour demain !
+                        <strong>{getFreeTasksTomorrow().length}</strong> {t.planner.freeTasksTomorrow}
                       </span>
                     </div>
                     <div className={styles.notifBannerActions}>
                       <button className={styles.notifBannerBtn} onClick={() => { setSelectedCalendarDay((() => { const d = new Date(); d.setDate(d.getDate() + 1); d.setHours(0,0,0,0); return d; })()); setActiveTab('planificateur'); }}>
-                        Voir le planificateur
+                        {t.planner.viewPlanner}
                       </button>
                       <button className={styles.notifBannerClose} onClick={() => setShowFreeTasksNotif(false)}>
                         <Icon name="xmark" size={14} />
@@ -3983,12 +4011,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     <div className={styles.notifBannerContent}>
                       <Icon name="target" size={16} />
                       <span>
-                        <strong>{getUnevaluatedTasks().length} tâche{getUnevaluatedTasks().length > 1 ? 's' : ''}</strong> à auto-évaluer
+                        <strong>{getUnevaluatedTasks().length}</strong> {t.planner.unevaluatedTasks}
                       </span>
                     </div>
                     <div className={styles.notifBannerActions}>
                       <button className={styles.notifBannerBtn} onClick={() => setActiveTab('taches')}>
-                        Évaluer
+                        {t.planner.evaluate}
                       </button>
                       <button className={styles.notifBannerClose} onClick={() => setShowEvalNotif(false)}>
                         <Icon name="xmark" size={14} />
@@ -3999,10 +4027,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
                 {/* Prochaines tâches */}
                 <div className={styles.monEspaceSection}>
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="clipboardList" size={16} />Mes prochaines tâches</h4>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="clipboardList" size={16} />{t.planner.myUpcomingTasks}</h4>
                   <div className={styles.tasksList}>
                     {getMyUpcomingTasks().length === 0 ? (
-                      <p className={styles.noTasks}>Aucune tâche à venir. Prenez des tâches dans le Planificateur !</p>
+                      <p className={styles.noTasks}>{t.planner.noUpcomingTasks}</p>
                     ) : (
                       getMyUpcomingTasks().map((item, idx) => {
                         const upcomingAssignment = getTaskAssignment(item.task.id, item.date);
@@ -4011,14 +4039,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         <div key={`${item.task.id}-${idx}`} className={styles.myTaskCard}>
                           <div className={styles.myTaskDate} style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '70px' }}>
                             <span style={{ fontWeight: 500 }}>
-                              {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
+                              {item.date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric' })}
                             </span>
                             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{formatTimeDisplay(item.timeSlot)}</span>
                           </div>
                           <div className={styles.myTaskInfo}>
-                            <strong>{item.task.title}{item.task.isRecurring && <span className={styles.recurringBadge} title="Récurrente"> ↻</span>}</strong>
+                            <strong>{item.task.title}{item.task.isRecurring && <span className={styles.recurringBadge} title={t.planner.recurring}> ↻</span>}</strong>
                             {myDish && <span className={styles.dishLabel}>{myDish}</span>}
-                            <span className={styles.taskMeta}>{item.task.duration} min · Pénibilité {item.task.penibility}%</span>
+                            <span className={styles.taskMeta}>{item.task.duration} {t.common.minutes} · {t.planner.penibilityShort} {item.task.penibility}%</span>
                           </div>
                           <span className={styles.taskPoints}>+{item.points} pts</span>
                         </div>
@@ -4032,7 +4060,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 {(getMyPastTasks().filter(t => !t.validated).length > 0 || getDelegatedToMeTasks().length > 0) && (
                   <div className={styles.monEspaceSection}>
                     <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px', color: 'var(--color-warning)' }}>
-                      <Icon name="clock" size={16} />Tâches à valider ({getMyPastTasks().filter(t => !t.validated).length + getDelegatedToMeTasks().length})
+                      <Icon name="clock" size={16} />{t.planner.tasksToValidate} ({getMyPastTasks().filter(t => !t.validated).length + getDelegatedToMeTasks().length})
                     </h4>
                     <div className={styles.pastTasksList}>
                       {/* Tâches déléguées par d'autres */}
@@ -4040,7 +4068,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         <div key={`delegated-${item.task.id}-${idx}`} className={`${styles.myTaskCard} ${styles.pendingTask}`} style={{ borderLeftColor: 'var(--color-primary)', borderLeftWidth: '3px' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '70px' }}>
                             <span style={{ fontWeight: 500 }}>
-                              {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
+                              {item.date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric' })}
                             </span>
                             <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)' }}>
                               Délégué par {item.delegatorName}
@@ -4055,7 +4083,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               className={styles.validateBtn}
                               onClick={() => validateTask(item.task.id, item.date, true)}
                             >
-                              <Icon name="check" size={12} style={{ marginRight: '4px' }} />Je l'ai fait
+                              <Icon name="check" size={12} style={{ marginRight: '4px' }} />{t.planner.iDidIt}
                             </button>
                           </div>
                         </div>
@@ -4066,7 +4094,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         <div key={`pending-${item.task.id}-${idx}`} className={`${styles.myTaskCard} ${styles.pendingTask}`} style={{ position: 'relative' }}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '70px' }}>
                             <span style={{ fontWeight: 500 }}>
-                              {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
+                              {item.date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric' })}
                             </span>
                             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{formatTimeDisplay(item.timeSlot)}</span>
                           </div>
@@ -4079,13 +4107,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               className={styles.validateBtn}
                               onClick={() => validateTask(item.task.id, item.date, true)}
                             >
-                              <Icon name="check" size={12} style={{ marginRight: '4px' }} />Fait
+                              <Icon name="check" size={12} style={{ marginRight: '4px' }} />{t.planner.iDidIt}
                             </button>
-                            <button 
+                            <button
                               className={styles.notDoneBtn}
                               onClick={() => setDelegationMenu({ taskId: item.task.id, date: item.date, timeSlot: item.timeSlot })}
                             >
-                              <Icon name="xmark" size={12} style={{ marginRight: '4px' }} />Pas fait
+                              <Icon name="xmark" size={12} style={{ marginRight: '4px' }} />{t.planner.notDone}
                             </button>
                           </div>
                           
@@ -4104,7 +4132,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               boxShadow: '0 4px 12px rgba(0,0,0,0.15)',
                               minWidth: '200px'
                             }}>
-                              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '8px' }}>Qui l'a fait ?</p>
+                              <p style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)', marginBottom: '8px' }}>{t.planner.whoDidIt}</p>
                               <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
                                 {users.filter(u => u.familyId === selectedFamily && u.id !== currentUser).map(member => (
                                   <button
@@ -4137,7 +4165,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                     fontSize: '0.875rem'
                                   }}
                                 >
-                                  Personne
+                                  {t.planner.nobody}
                                 </button>
                                 <button
                                   onClick={() => setDelegationMenu(null)}
@@ -4153,7 +4181,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                     marginTop: '4px'
                                   }}
                                 >
-                                  Annuler
+                                  {t.common.cancel}
                                 </button>
                               </div>
                             </div>
@@ -4172,7 +4200,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       onClick={() => setShowPastTasks(!showPastTasks)}
                       style={{ display: 'flex', alignItems: 'center', gap: '6px' }}
                     >
-                      <Icon name={showPastTasks ? "chevronDown" : "chevronRight"} size={12} />Historique ({getMyPastTasks().filter(t => t.validated).length + getMyDelegatedTasks().length + getAcceptedDelegationsToMe().length})
+                      <Icon name={showPastTasks ? "chevronDown" : "chevronRight"} size={12} />{t.planner.history} ({getMyPastTasks().filter(t => t.validated).length + getMyDelegatedTasks().length + getAcceptedDelegationsToMe().length})
                     </button>
                     
                     {showPastTasks && (
@@ -4182,7 +4210,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           <div key={`validated-${item.task.id}-${idx}`} className={`${styles.myTaskCard} ${styles.validatedTask}`}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '70px' }}>
                               <span style={{ fontWeight: 500 }}>
-                                {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
+                                {item.date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric' })}
                               </span>
                               <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>{formatTimeDisplay(item.timeSlot)}</span>
                             </div>
@@ -4195,7 +4223,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               <button 
                                 className={styles.cancelValidationBtn}
                                 onClick={() => validateTask(item.task.id, item.date, false)}
-                                title="Annuler la validation"
+                                title={t.planner.cancelValidation}
                                 style={{ 
                                   border: '1px solid #000', 
                                   backgroundColor: '#fff', 
@@ -4216,7 +4244,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           <div key={`delegated-${item.task.id}-${idx}`} className={styles.myTaskCard} style={{ opacity: 0.7 }}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '70px' }}>
                               <span style={{ fontWeight: 500 }}>
-                                {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
+                                {item.date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric' })}
                               </span>
                             </div>
                             <div className={styles.myTaskInfo}>
@@ -4231,11 +4259,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 backgroundColor: item.delegatedToName ? 'var(--color-primary-subtle)' : 'var(--color-bg-subtle)',
                                 borderRadius: '4px'
                               }}>
-                                {item.delegatedToName ? `Fait par ${item.delegatedToName}` : 'Non fait'}
+                                {item.delegatedToName ? `${t.planner.doneBy} ${item.delegatedToName}` : t.planner.notDone}
                               </span>
                               <button
                                 onClick={() => undelegateTask(item.task.id, item.date)}
-                                title="Annuler la délégation"
+                                title={t.planner.cancelDelegation}
                                 style={{
                                   border: '1px solid #000',
                                   backgroundColor: '#fff',
@@ -4256,7 +4284,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           <div key={`accepted-${item.task.id}-${idx}`} className={`${styles.myTaskCard} ${styles.validatedTask}`}>
                             <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '70px' }}>
                               <span style={{ fontWeight: 500 }}>
-                                {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
+                                {item.date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric' })}
                               </span>
                               <span style={{ fontSize: '0.75rem', color: 'var(--color-primary)' }}>
                                 Via {item.delegatorName}
@@ -4270,7 +4298,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               <span className={styles.validatedBadge}><Icon name="check" size={12} style={{ marginRight: '4px' }} />+{item.points} pts</span>
                               <button
                                 onClick={() => validateTask(item.task.id, item.date, false)}
-                                title="Annuler la validation"
+                                title={t.planner.cancelValidation}
                                 style={{
                                   border: '1px solid #000',
                                   backgroundColor: '#fff',
@@ -4292,19 +4320,19 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
                 {/* Tâche exceptionnelle */}
                 <div className={styles.monEspaceSection}>
-                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="star" size={16} />Ajouter une tâche exceptionnelle</h4>
-                  <p className={styles.mutedSmall}>Vous avez fait quelque chose en plus ? Ajoutez-le ici pour gagner des points !</p>
+                  <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="star" size={16} />{t.planner.addExceptionalTask}</h4>
+                  <p className={styles.mutedSmall}>{t.planner.exceptionalTaskDesc}</p>
                   
                   <div className={styles.exceptionalForm}>
                     <input
                       value={newExceptionalTask.title}
                       onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, title: e.target.value }))}
-                      placeholder="Ex: Nettoyage du garage"
+                      placeholder={t.planner.exceptionalTaskPlaceholder}
                       className={styles.exceptionalInput}
                     />
                     <div className={styles.exceptionalNumbers}>
                       <div className={styles.numberField}>
-                        <label>Durée (min)</label>
+                        <label>{t.planner.duration}</label>
                         <input
                           type="number"
                           value={newExceptionalTask.duration}
@@ -4313,7 +4341,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         />
                       </div>
                       <div className={styles.numberField}>
-                        <label>Pénibilité (%)</label>
+                        <label>{t.planner.penibility}</label>
                         <input
                           type="number"
                           value={newExceptionalTask.penibility}
@@ -4323,7 +4351,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         />
                       </div>
                       <div className={styles.numberField}>
-                        <label>Points</label>
+                        <label>{t.common.pts}</label>
                         <span className={styles.previewPoints}>
                           +{Math.round((newExceptionalTask.duration * newExceptionalTask.penibility) / 10)} pts
                         </span>
@@ -4334,32 +4362,32 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       onClick={addExceptionalTask}
                       disabled={!newExceptionalTask.title.trim()}
                     >
-                      ➕ Ajouter et gagner les points
+                      ➕ {t.planner.addAndEarnPoints}
                     </button>
                   </div>
 
                   {/* Liste des tâches exceptionnelles */}
                   {getMyExceptionalTasks().length > 0 && (
                     <div className={styles.exceptionalList}>
-                      <h5><Icon name="star" size={14} />Mes tâches exceptionnelles ({getMyExceptionalTasks().length})</h5>
+                      <h5><Icon name="star" size={14} />{t.planner.myExceptionalTasks} ({getMyExceptionalTasks().length})</h5>
                       {getMyExceptionalTasks().map(task => (
                         <div key={task.id} className={styles.myTaskCard}>
                           <div style={{ display: 'flex', flexDirection: 'column', gap: '2px', minWidth: '70px' }}>
                             <span style={{ fontWeight: 500 }}>
-                              {new Date(task.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })}
+                              {new Date(task.date).toLocaleDateString(locale, { weekday: 'short', day: 'numeric' })}
                             </span>
                             <span style={{ fontSize: '0.75rem', color: 'var(--color-text-muted)' }}>
-                              {new Date(task.date).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}
+                              {new Date(task.date).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}
                             </span>
                           </div>
                           <div className={styles.myTaskInfo}>
                             <strong>{task.title}</strong>
-                            <span className={styles.taskMeta}>{task.duration} min · Pénibilité {task.penibility}%</span>
+                            <span className={styles.taskMeta}>{task.duration} {t.common.minutes} · {t.planner.penibilityShort} {task.penibility}%</span>
                           </div>
                           <span className={styles.taskPoints}>+{calculateExceptionalPoints(task)} pts</span>
                           <button
                             onClick={() => deleteExceptionalTask(task.id)}
-                            title="Supprimer cette tâche"
+                            title={t.planner.deleteTask}
                             style={{
                               border: '1px solid #000',
                               backgroundColor: '#fff',
@@ -4385,31 +4413,31 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       {activeTab === "taches" && (
         <section className={styles.tabPanel}>
           <div className={styles.cardPanel}>
-            <h3>Gestion des tâches</h3>
+              <h3>{t.planner.taskManagement}</h3>
             
             {!selectedFamily && (
               <div className={styles.warningBox}>
                 <Icon name="warning" size={16} />
-                <span>Créez ou rejoignez une famille dans les Paramètres pour ajouter des tâches</span>
+                <span>{t.planner.createFamilyForTasks}</span>
               </div>
             )}
 
             {/* Formulaire d'ajout */}
             <div className={styles.taskFormCard}>
-              <h4><Icon name="circlePlus" size={18} />Nouvelle tâche</h4>
+              <h4><Icon name="circlePlus" size={18} />{t.planner.newTask}</h4>
               
               <div className={styles.taskFormGrid}>
                 <div className={styles.taskFormField}>
-                  <label>Nom de la tâche</label>
+                  <label>{t.planner.taskName}</label>
                   <input
                     value={newTask.title}
                     onChange={(e) => setNewTask((t) => ({ ...t, title: e.target.value }))}
-                    placeholder="Ex: Aspirateur salon"
+                    placeholder={t.planner.taskPlaceholder}
                   />
                 </div>
 
                 <div className={styles.taskFormField}>
-                  <label>Durée (min)</label>
+                  <label>{t.planner.duration}</label>
                   <input
                     type="number"
                     value={newTask.duration}
@@ -4419,7 +4447,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 </div>
 
                 <div className={styles.taskFormField}>
-                  <label>Pénibilité (%)</label>
+                  <label>{t.planner.penibility}</label>
                   <input
                     type="number"
                     value={newTask.penibility}
@@ -4430,11 +4458,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 </div>
 
                 <div className={`${styles.taskFormField} ${styles.fullWidth}`}>
-                  <label>Créneaux</label>
+                  <label>{t.planner.slots}</label>
                   <div className={styles.scheduleBuilder}>
                     <select value={newTaskDay} onChange={(e) => setNewTaskDay(e.target.value)}>
                       {dayOptions.map((day) => (
-                        <option key={day}>{day}</option>
+                        <option key={day} value={day}>{translateDay(day)}</option>
                       ))}
                     </select>
                     <button
@@ -4449,27 +4477,27 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           setNewTaskTime("Matin");
                         }
                       }}
-                      title={newTaskTimeMode === "slot" ? "Passer en heure précise" : "Passer en créneau"}
+                      title={newTaskTimeMode === "slot" ? t.planner.switchExactTime : t.planner.switchSlot}
                     >
                       <Icon name="clock" size={12} />
                     </button>
                     {newTaskTimeMode === "slot" ? (
                       <select value={newTaskTime} onChange={(e) => setNewTaskTime(e.target.value)}>
-                        <option value="Matin">Matin</option>
-                        <option value="Après-midi">Après-midi</option>
-                        <option value="Soir">Soir</option>
+                        {timeSlotOptions.map((ts) => (
+                          <option key={ts} value={ts}>{translateTime(ts)}</option>
+                        ))}
                       </select>
                     ) : (
                       <input type="time" value={newTaskTime} onChange={(e) => setNewTaskTime(e.target.value)} />
                     )}
                     <button type="button" className={styles.smallButton} onClick={addNewTaskSchedule}>
                       <Icon name="circlePlus" size={12} />
-                      Ajouter
+                      {t.common.add}
                     </button>
                   </div>
                   <div className={styles.scheduleChips}>
                     {newTaskSchedules.length === 0 ? (
-                      <span className={styles.mutedSmall}>Aucun créneau ajouté</span>
+                      <span className={styles.mutedSmall}>{t.planner.noSlots}</span>
                     ) : (
                       newTaskSchedules.map((entry) => (
                         <button
@@ -4477,10 +4505,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           type="button"
                           className={styles.scheduleChip}
                           onClick={() => removeNewTaskSchedule(entry)}
-                          title={`Supprimer ${entry}`}
+                          title={`${t.planner.removeEntry} ${translateSlot(entry)}`}
                         >
                           <Icon name="trash" size={11} />
-                          {entry}
+                          {translateSlot(entry)}
                         </button>
                       ))
                     )}
@@ -4495,7 +4523,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     checked={newTaskIsCooking}
                     onChange={(e) => setNewTaskIsCooking(e.target.checked)}
                   />
-                  <span>Tâche de cuisine</span>
+                  <span>{t.planner.cookingTaskLabel}</span>
                 </label>
                 <label className={styles.taskOptionToggle}>
                   <input
@@ -4503,7 +4531,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     checked={newTaskIsRecurring}
                     onChange={(e) => setNewTaskIsRecurring(e.target.checked)}
                   />
-                  <span>Inscription récurrente</span>
+                  <span>{t.planner.recurringRegistration}</span>
                 </label>
               </div>
 
@@ -4514,7 +4542,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   disabled={!newTask.title.trim() || !selectedFamily}
                 >
                   <Icon name="circlePlus" size={16} />
-                  Ajouter la tâche
+                  {t.planner.addTask}
                 </button>
               </div>
             </div>
@@ -4534,8 +4562,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 <Icon name={getUserEvaluationCount(currentUser) >= familyTasks.length ? "check" : "sliders"} size={16} />
                 <span>
                   {getUserEvaluationCount(currentUser) >= familyTasks.length 
-                    ? "Vous avez évalué toutes les tâches ✓ — Les points sont calculés sur la médiane des évaluations."
-                    : `Évaluations personnelles: ${getUserEvaluationCount(currentUser)}/${familyTasks.length} tâches — Évaluez les tâches pour améliorer l'auto-attribution.`
+                    ? t.planner.allEvaluatedFull
+                    : `${t.planner.personalEvalsShort}: ${getUserEvaluationCount(currentUser)}/${familyTasks.length} ${t.common.tasks} — ${t.planner.evalToImprove}`
                   }
                 </span>
               </div>
@@ -4554,20 +4582,20 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     <div className={styles.taskInfo}>
                       {isEditing ? (
                         <div className={styles.formGridSmall}>
-                          <label className={styles.label}>Nom</label>
+                          <label className={styles.label}>{t.planner.nameLabel}</label>
                           <input
                             value={editTaskDraft.title}
                             onChange={(e) => setEditTaskDraft((t) => ({ ...t, title: e.target.value }))}
-                            placeholder="Nom de la tâche"
+                            placeholder={t.planner.taskName}
                           />
-                          <label className={styles.label}>Durée (min)</label>
+                          <label className={styles.label}>{t.planner.duration}</label>
                           <input
                             type="number"
                             value={editTaskDraft.duration}
                             onChange={(e) => setEditTaskDraft((t) => ({ ...t, duration: Number(e.target.value) }))}
                             min={5}
                           />
-                          <label className={styles.label}>Pénibilité (%)</label>
+                          <label className={styles.label}>{t.planner.penibility}</label>
                           <input
                             type="number"
                             value={editTaskDraft.penibility}
@@ -4575,14 +4603,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             min={0}
                             max={100}
                           />
-                          <label className={styles.label}>Ajouter un créneau</label>
+                          <label className={styles.label}>{t.planner.addSlot}</label>
                           <div className={styles.scheduleBuilder}>
                             <select
                               value={getScheduleDraft(task.id).day}
                               onChange={(e) => updateScheduleDraft(task.id, { day: e.target.value })}
                             >
                               {dayOptions.map((day) => (
-                                <option key={day}>{day}</option>
+                                <option key={day} value={day}>{translateDay(day)}</option>
                               ))}
                             </select>
                             <input
@@ -4594,7 +4622,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               <Icon name="circlePlus" size={12} />
                             </button>
                           </div>
-                          <label className={styles.label}>Créneaux</label>
+                          <label className={styles.label}>{t.planner.slots}</label>
                           <div className={styles.scheduleChips}>
                             {schedules.map((entry) => (
                               <button
@@ -4603,10 +4631,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 className={styles.scheduleChip}
                                 onClick={() => removeScheduleFromTask(task.id, entry)}
                                 disabled={schedules.length <= 1}
-                                title={`Supprimer ${entry}`}
+                                title={`${t.planner.removeEntry} ${translateSlot(entry)}`}
                               >
                                 <Icon name="trash" size={11} />
-                                {entry}
+                                {translateSlot(entry)}
                               </button>
                             ))}
                           </div>
@@ -4642,10 +4670,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           <>
                             <button className={styles.smallButton} onClick={saveEditTask}>
                               <Icon name="check" size={12} />
-                              Enregistrer
+                              {t.common.save}
                             </button>
                             <button className={styles.smallGhost} onClick={cancelEditTask}>
-                              Annuler
+                              {t.common.cancel}
                             </button>
                           </>
                         ) : (
@@ -4660,24 +4688,24 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 });
                                 setShowEvaluationModal(task.id);
                               }}
-                              aria-label={getMyEvaluation(task.id) ? "Modifier mon évaluation" : "Évaluer cette tâche"}
-                              title={getMyEvaluation(task.id) ? "Modifier mon évaluation" : "Évaluer cette tâche"}
+                              aria-label={getMyEvaluation(task.id) ? t.planner.editEvaluation : t.planner.evaluateTask}
+                              title={getMyEvaluation(task.id) ? t.planner.editEvaluation : t.planner.evaluateTask}
                             >
                               <Icon name={getMyEvaluation(task.id) ? "check" : "sliders"} size={14} />
                             </button>
                             <button
                               className={styles.editBtn}
                               onClick={() => startEditTask(task)}
-                              aria-label="Modifier"
-                              title="Modifier"
+                              aria-label={t.common.edit}
+                              title={t.common.edit}
                             >
                               <Icon name="pen" size={14} />
                             </button>
                             <button
                               className={styles.deleteBtn}
                               onClick={() => deleteTask(task.id)}
-                              aria-label="Supprimer"
-                              title="Supprimer"
+                              aria-label={t.common.delete}
+                              title={t.common.delete}
                             >
                               <Icon name="trash" size={14} />
                             </button>
@@ -4691,7 +4719,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               
               {familyTasks.length === 0 && (
                 <div className={styles.emptyTasks}>
-                  <p>Aucune tâche pour le moment. Ajoutez-en une ci-dessus !</p>
+                  <p>{t.planner.noTasks}</p>
                 </div>
               )}
             </div>
@@ -4703,20 +4731,20 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         <section className={styles.tabPanel}>
           <div className={styles.cardPanel}>
             <div className={styles.calendarHeader}>
-              <h3>Calendrier familial</h3>
+              <h3>{t.planner.familyCalendar}</h3>
               <div className={styles.calendarControls}>
                 <button onClick={() => openCreateEventForm()}>
-                  <Icon name="plus" size={14} style={{ marginRight: '6px' }} />Nouvel événement
+                  <Icon name="plus" size={14} style={{ marginRight: '6px' }} />{t.planner.newEvent}
                 </button>
                 <button onClick={() => setShowMemberSettings(!showMemberSettings)}>
-                  {showMemberSettings ? "Voir calendrier" : <><Icon name="gear" size={14} style={{ marginRight: '6px' }} />Paramètres membres</>}
+                  {showMemberSettings ? t.planner.viewCalendar : <><Icon name="gear" size={14} style={{ marginRight: '6px' }} />{t.planner.memberSettings}</>}
                 </button>
               </div>
             </div>
 
             {showMemberSettings ? (
               <div className={styles.memberSettings}>
-                <h4>Paramètres du calendrier</h4>
+                <h4>{t.planner.calendarSettings}</h4>
                 <div className={styles.memberSettingsList}>
                   {calendarMembers.map((member) => (
                     <div key={member.id} className={styles.memberRow}>
@@ -4737,7 +4765,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               updateMemberLocalState(member.id, "color", e.target.value);
                               updateMemberCalendarSettings(member.membershipId, e.target.value, member.calendarUrl);
                             }}
-                            title="Couleur du membre"
+                            title={t.planner.memberColor}
                             className={styles.hiddenColorInput}
                           />
                         </label>
@@ -4745,10 +4773,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       </div>
                       <div className={styles.memberInputs}>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 2, flex: 1 }}>
-                          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: 2 }}>Lien iCal du membre</span>
+                          <span style={{ fontSize: '0.82rem', color: 'var(--color-text-muted)', marginBottom: 2 }}>{t.planner.icalLink}</span>
                           <input
                             type="text"
-                            placeholder="URL iCal (webcal://...)"
+                            placeholder={t.planner.icalPlaceholder}
                             value={member.calendarUrl || ""}
                             onChange={(e) => updateMemberLocalState(member.id, "calendarUrl", e.target.value)}
                             className={styles.calendarUrlInput}
@@ -4766,22 +4794,22 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             } catch (err) {
                               console.error("Failed to paste:", err);
                               // Fallback: prompt user to paste manually
-                              const manualText = prompt("Collez l'URL iCal ici:");
+                              const manualText = prompt(t.planner.pasteIcalHere);
                               if (manualText) {
                                 updateMemberLocalState(member.id, "calendarUrl", manualText);
                               }
                             }
                           }}
-                          title="Coller depuis le presse-papiers"
+                          title={t.planner.pasteFromClipboard}
                         >
-                          <Icon name="paste" size={12} style={{ marginRight: '4px' }} />Coller
+                          <Icon name="paste" size={12} style={{ marginRight: '4px' }} />{t.common.paste}
                         </button>
                         <button
                           type="button"
                           className={styles.saveBtn}
                           onClick={() => {
                             updateMemberCalendarSettings(member.membershipId, member.color, member.calendarUrl);
-                            alert("URL sauvegardée !");
+                            alert(t.planner.urlSaved);
                           }}
                         >
                           <Icon name="circleCheck" size={12} style={{ marginRight: '4px' }} />Sauvegarder
@@ -4791,12 +4819,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   ))}
                 </div>
                 <div className={styles.helpBox}>
-                  <strong>Comment obtenir l'URL iCal d'Apple Calendar ?</strong>
+                  <strong>{t.planner.howToGetIcal}</strong>
                   <ol>
-                    <li>Ouvrez Apple Calendar sur Mac ou iCloud.com</li>
-                    <li>Clic droit sur le calendrier → Partager le calendrier</li>
-                    <li>Cochez "Calendrier public" et copiez l'URL</li>
-                    <li>Collez l'URL ici (commence par webcal:// ou https://)</li>
+                    <li>{t.planner.icalStep1}</li>
+                    <li>{t.planner.icalStep2}</li>
+                    <li>{t.planner.icalStep3}</li>
+                    <li>{t.planner.icalStep4}</li>
                   </ol>
                 </div>
               </div>
@@ -4810,14 +4838,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     className={styles.todayBtn}
                     onClick={() => setCurrentDate(new Date())}
                   >
-                    Aujourd'hui
+                    {t.planner.today}
                   </button>
                 </div>
 
                 <div className={styles.calendarContainer}>
                   <div className={styles.calendarWeekHeader}>
-                    {["Lun", "Mar", "Mer", "Jeu", "Ven", "Sam", "Dim"].map((day) => (
-                      <div key={day} className={styles.weekDay}>{day}</div>
+                    {dayOptions.map((day) => (
+                      <div key={day} className={styles.weekDay}>{translateDay(day)}</div>
                     ))}
                   </div>
                   <div className={styles.calendarGrid}>
@@ -4849,7 +4877,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 title={`${event.title} - ${event.userName}`}
                               >
                                 <span className={styles.eventTime}>
-                                  {event.allDay ? "Journée" : new Date(event.start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
+                                  {event.allDay ? t.timeSlots.allDay : new Date(event.start).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
                                 </span>
                                 <span className={styles.eventTitle}>{event.title}</span>
                               </div>
@@ -4866,7 +4894,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
                 {/* Legend */}
                 <div className={styles.calendarLegend}>
-                  <h4>Membres</h4>
+                  <h4>{t.planner.members}</h4>
                   <div className={styles.legendItems}>
                     {calendarMembers.map((member) => (
                       <div key={member.id} className={styles.legendItem}>
@@ -4895,7 +4923,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       </div>
                       <div className={styles.eventModalBody}>
                         <p>
-                          <strong>Date :</strong> {new Date(selectedEvent.start).toLocaleDateString("fr-FR", { 
+                          <strong>Date :</strong> {new Date(selectedEvent.start).toLocaleDateString(locale, { 
                             weekday: "long", 
                             year: "numeric", 
                             month: "long", 
@@ -4904,28 +4932,28 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         </p>
                         {!selectedEvent.allDay && (
                           <p>
-                            <strong>Heure :</strong> {new Date(selectedEvent.start).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}
-                            {selectedEvent.end && ` - ${new Date(selectedEvent.end).toLocaleTimeString("fr-FR", { hour: "2-digit", minute: "2-digit" })}`}
+                            <strong>Heure :</strong> {new Date(selectedEvent.start).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}
+                            {selectedEvent.end && ` - ${new Date(selectedEvent.end).toLocaleTimeString(locale, { hour: "2-digit", minute: "2-digit" })}`}
                           </p>
                         )}
                         {selectedEvent.location && (
-                          <p><strong>Lieu :</strong> {selectedEvent.location}</p>
+                          <p><strong>{t.planner.location}</strong> {selectedEvent.location}</p>
                         )}
                         {selectedEvent.description && (
-                          <p><strong>Description :</strong> {selectedEvent.description}</p>
+                          <p><strong>{t.planner.description}</strong> {selectedEvent.description}</p>
                         )}
                         {selectedEvent.isLocal && selectedEvent.userId === currentUser ? (
                           <div className={styles.eventModalActions}>
                             <button onClick={() => { setSelectedEvent(null); openEditEventForm(selectedEvent); }}>
-                              <Icon name="pen" size={14} /> Modifier
+                              <Icon name="pen" size={14} /> {t.common.edit}
                             </button>
                             <button className={styles.eventDeleteBtn} onClick={() => handleEventDelete(selectedEvent.localEventId)}>
-                              <Icon name="trash" size={14} /> Supprimer
+                              <Icon name="trash" size={14} /> {t.common.delete}
                             </button>
                           </div>
                         ) : (
                           <p className={styles.unavailableNote} style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                            <Icon name="warning" size={14} />{selectedEvent.userName} n&apos;est pas disponible pendant cet événement
+                            <Icon name="warning" size={14} />{selectedEvent.userName} {t.planner.unavailableDuring}
                           </p>
                         )}
                       </div>
@@ -4942,7 +4970,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         <section className={styles.tabPanel}>
           <div className={styles.cardPanel}>
             <div className={styles.plannerHeader}>
-              <h3>Mon Planning</h3>
+              <h3>{t.planner.myPlanning}</h3>
               <div className={styles.plannerNav}>
                 <button onClick={() => navigatePlannerDays(-1)} className={styles.navBtn}>
                   <Icon name="arrowLeft" size={12} />
@@ -4952,7 +4980,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   onClick={() => setPlannerStartDate(new Date())} 
                   className={styles.todayBtn}
                 >
-                  Aujourd'hui
+                  {t.planner.today}
                 </button>
                 <button onClick={() => navigatePlannerDays(1)} className={styles.navBtn}>
                   <span>Suivant</span>
@@ -4962,10 +4990,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               <button
                 onClick={() => autoAssign()}
                 className={`${styles.autoAssignBtn} ${isAllWeekAssigned ? styles.autoAssignBtnDone : ''}`}
-                title={isAllWeekAssigned ? "Toutes les tâches sont déjà attribuées" : "Attribuer automatiquement les tâches non assignées"}
+                title={isAllWeekAssigned ? t.planner.allTasksAssigned : t.planner.autoAssign}
               >
                 <Icon name="sparkles" size={14} />
-                Auto-attribution
+                {t.planner.autoAssignLabel}
               </button>
             </div>
 
@@ -4980,7 +5008,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   <div key={dayIdx} className={`${styles.plannerDay} ${isToday ? styles.plannerToday : ''}`}>
                     <div className={styles.plannerDayHeader}>
                       <h4>{formatPlannerDate(day)}</h4>
-                      {isToday && <span className={styles.todayBadge}>Aujourd'hui</span>}
+                      {isToday && <span className={styles.todayBadge}>{t.planner.today}</span>}
                     </div>
 
                     {/* Afficher les indisponibilités du jour */}
@@ -4988,7 +5016,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       <div className={styles.dayUnavailabilities}>
                         <div className={styles.unavailabilityHeader}>
                           <Icon name="warning" size={14} />
-                          Mes indisponibilités
+                          {t.planner.myUnavailabilities}
                         </div>
                         {myUnavailabilities.map((unavail, idx) => (
                           <div key={idx} className={styles.unavailabilityItem}>
@@ -5028,9 +5056,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 className={`${styles.plannerTask} ${isAssignedToMe ? styles.myTask : ''} ${isAssignedToOther ? styles.takenTask : ''} ${iAmBusy && !isAssignedToOther && !isAssignedToMe ? styles.busyTask : ''}`}
                               >
                                 <div className={styles.plannerTaskInfo}>
-                                  <strong>{task.title}{task.isRecurring && <span className={styles.recurringBadge} title="Tâche récurrente"> ↻</span>}</strong>
+                                  <strong>{task.title}{task.isRecurring && <span className={styles.recurringBadge} title={t.planner.recurring}> ↻</span>}</strong>
                                   <span className={styles.taskDetails}>
-                                    {task.duration} min · Pénibilité {task.penibility}%
+                                    {task.duration} {t.common.minutes} · {t.planner.penibilityShort} {task.penibility}%
                                   </span>
                                 </div>
                                 <div className={styles.plannerTaskMeta}>
@@ -5051,7 +5079,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                       onClick={() => unclaimTask(task.id, day)}
                                     >
                                       <Icon name="check" size={12} />
-                                      Pris par moi{task.isCooking && assignment?.dishes?.[currentUser || ''] ? ` (${assignment.dishes[currentUser || '']})` : ''}{assignedUserIds.length > 1 ? ` (+${assignedUserIds.length - 1})` : ''} · Annuler
+                                      {t.planner.takenByMe}{task.isCooking && assignment?.dishes?.[currentUser || ''] ? ` (${assignment.dishes[currentUser || '']})` : ''}{assignedUserIds.length > 1 ? ` (+${assignedUserIds.length - 1})` : ''} · {t.common.cancel}
                                     </button>
                                   )}
                                   {assignedUserIds.length === 0 && !iAmBusy && (
@@ -5067,13 +5095,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                       className={styles.claimBtn}
                                       onClick={() => claimTask(task.id, day)}
                                     >
-                                      Rejoindre
+                                      {t.planner.register}
                                     </button>
                                   )}
                                   {assignedUserIds.length === 0 && iAmBusy && (
                                     <span className={styles.busyBadge}>
                                       <Icon name="warning" size={12} />
-                                      Indisponible
+                                      {t.planner.unavailable}
                                     </span>
                                   )}
                                   {currentUserRecord?.isAdmin && (
@@ -5086,13 +5114,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                             prev?.key === taskKey ? null : { taskId: task.id, date: day, key: taskKey }
                                           );
                                         }}
-                                        title="Gérer l'inscription"
+                                        title={t.planner.manageRegistration}
                                       >
                                         <Icon name="users" size={12} />
                                       </button>
                                       {adminAssignMenu?.key === taskKey && (
                                         <div className={styles.adminAssignDropdown}>
-                                          <div className={styles.adminAssignHeader}>Inscrire un membre</div>
+                                          <div className={styles.adminAssignHeader}>{t.planner.assignMember}</div>
                                           {familyUsers.filter(u => u.familyId === selectedFamily).map(member => {
                                             const isMemberAssigned = assignedUserIds.includes(member.id);
                                             return (
@@ -5121,7 +5149,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     ))}
 
                     {tasksForDay.length === 0 && (
-                      <p className={styles.noTasks}>Aucune tâche ce jour</p>
+                      <p className={styles.noTasks}>{t.planner.noTasksThisDay}</p>
                     )}
                   </div>
                 );
@@ -5131,19 +5159,19 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             <div className={styles.plannerLegend}>
               <div className={styles.legendRow}>
                 <span className={styles.legendSample} style={{ backgroundColor: 'rgba(100, 200, 100, 0.2)', borderLeft: '3px solid #64c864' }}></span>
-                <span>Pris par moi</span>
+                <span>{t.planner.takenByMe}</span>
               </div>
               <div className={styles.legendRow}>
                 <span className={styles.legendSample} style={{ backgroundColor: 'rgba(239, 68, 68, 0.15)', borderLeft: '3px solid #ef4444' }}></span>
-                <span>Pris par quelqu'un d'autre</span>
+                <span>{t.planner.takenBySomeoneElse}</span>
               </div>
               <div className={styles.legendRow}>
                 <span className={styles.legendSample} style={{ backgroundColor: 'rgba(255, 200, 100, 0.15)', borderLeft: '3px solid #ffc864' }}></span>
-                <span>Je suis indisponible</span>
+                <span>{t.planner.iAmUnavailable}</span>
               </div>
               <div className={styles.legendRow}>
                 <span className={styles.legendSample} style={{ backgroundColor: 'transparent', borderLeft: '3px solid var(--border)' }}></span>
-                <span>Disponible</span>
+                <span>{t.planner.available}</span>
               </div>
             </div>
           </div>
@@ -5156,7 +5184,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             {/* Quota et équité */}
             <div className={styles.quotaCard}>
               <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px', justifyContent: 'space-between' }}>
-                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="target" size={18} />Équité hebdomadaire</span>
+                <span style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="target" size={18} />{t.planner.weeklyEquity}</span>
                 <button 
                   onClick={() => setShowQuotaExplain(true)} 
                   style={{ 
@@ -5173,23 +5201,23 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     fontSize: '14px',
                     fontWeight: 600
                   }}
-                  title="Comment sont calculés les points ?"
+                  title={t.planner.howPointsCalculated}
                 >
                   ?
                 </button>
               </h3>
               {!selectedFamily ? (
                 <p className={styles.mutedSmall} style={{ color: "#ff6b6b", display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Icon name="warning" size={14} />Sélectionnez une famille pour voir les quotas
+                  <Icon name="warning" size={14} />{t.planner.selectFamilyQuotas}
                 </p>
               ) : familyUsers.length === 0 ? (
-                <p className={styles.mutedSmall}>Aucun membre dans la famille</p>
+                <p className={styles.mutedSmall}>{t.planner.noMembers}</p>
               ) : getActiveMembers().length === 0 ? (
-                <p className={styles.mutedSmall}>Aucun membre actif dans le classement</p>
+                <p className={styles.mutedSmall}>{t.planner.noActiveRanking}</p>
               ) : (
                 <>
                   <h4 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <Icon name="listCheck" size={16} />Objectifs cette semaine
+                    <Icon name="listCheck" size={16} />{t.planner.weeklyGoals}
                     {getActiveMembers().length < familyUsers.length && (
                       <span style={{ fontSize: '11px', color: 'var(--color-text-muted)', fontWeight: 400 }}>
                         ({getActiveMembers().length}/{familyUsers.length} actifs)
@@ -5222,7 +5250,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         <div key={user.id} className={`${styles.equityRow} ${isMe ? styles.myEquityRow : ''}`}>
                           <div className={styles.equityUser}>
                             <span className={styles.equityName}>
-                              {user.name} {isMe && <span className={styles.meBadge}>(moi)</span>}
+                              {user.name} {isMe && <span className={styles.meBadge}>{t.common.me}</span>}
                             </span>
                             <div className={styles.equityTags}>
                               {absenceDays > 0 && (
@@ -5246,9 +5274,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           </div>
                           <div className={styles.equityStatus}>
                             {remaining > 0 ? (
-                              <span className={styles.remaining}>Reste {remaining} pts</span>
+                              <span className={styles.remaining}>{t.planner.remaining} {remaining} pts</span>
                             ) : (
-                              <span className={styles.completed} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Icon name="circleCheck" size={12} />Quota atteint</span>
+                              <span className={styles.completed} style={{ display: 'flex', alignItems: 'center', gap: '4px' }}><Icon name="circleCheck" size={12} />{t.planner.quotaReached}</span>
                             )}
                           </div>
                         </div>
@@ -5261,25 +5289,25 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
             {/* Classement */}
             <div className={styles.scoreCard}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="trophy" size={18} />Classement</h3>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="trophy" size={18} />{t.planner.ranking}</h3>
               {!selectedFamily ? (
                 <p className={styles.mutedSmall} style={{ color: "#ff6b6b", display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <Icon name="warning" size={14} />Sélectionnez une famille pour voir le classement
+                  <Icon name="warning" size={14} />{t.planner.selectFamilyRanking}
                 </p>
               ) : familyUsers.length === 0 ? (
-                <p className={styles.mutedSmall}>Aucun membre dans la famille</p>
+                <p className={styles.mutedSmall}>{t.planner.noMembers}</p>
               ) : (
                 <>
                   <div className={styles.rankingFilters}>
                     <div className={styles.rankingFilterGroup}>
-                      <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'week' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('week')}>Semaine</button>
-                      <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'month' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('month')}>Mois</button>
-                      <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'all' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('all')}>Toujours</button>
+                      <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'week' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('week')}>{t.planner.week}</button>
+                      <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'month' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('month')}>{t.planner.month}</button>
+                      <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'all' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('all')}>{t.planner.allTime}</button>
                     </div>
                     <div className={styles.rankingFilterGroup}>
-                      <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'points' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('points')}>Points</button>
-                      <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'tasks' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('tasks')}>Tâches</button>
-                      <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'time' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('time')}>Temps</button>
+                      <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'points' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('points')}>{t.common.pts}</button>
+                      <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'tasks' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('tasks')}>{t.common.tasks}</button>
+                      <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'time' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('time')}>{t.planner.timeLabel}</button>
                     </div>
                   </div>
                   {getFilteredLeaderboard().map((user, idx) => {
@@ -5292,13 +5320,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         key={user.id}
                         className={`${styles.scoreRow} ${isMe ? styles.myScoreRow : ''} ${styles.clickableRow}`}
                         onClick={() => setPointsHistoryModal({ userId: user.id, userName: user.name })}
-                        title="Cliquez pour voir l'historique des gains"
+                        title={t.planner.clickViewHistory}
                       >
                         <div className={styles.rankBadge}>
                           {idx === 0 ? '🥇' : idx === 1 ? '🥈' : idx === 2 ? '🥉' : `${idx + 1}`}
                         </div>
                         <div className={styles.scoreUserInfo}>
-                          <p>{user.name} {isMe && <span className={styles.meBadge}>(moi)</span>}</p>
+                          <p>{user.name} {isMe && <span className={styles.meBadge}>{t.common.me}</span>}</p>
                           <span className={styles.taskMeta}>{formatMetricSubtext(user)}</span>
                         </div>
                         <div className={styles.scoreBar}>
@@ -5317,7 +5345,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
             {/* Stats */}
             <div className={styles.impactCard}>
-              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="chartBar" size={18} />Statistiques</h3>
+              <h3 style={{ display: 'flex', alignItems: 'center', gap: '8px' }}><Icon name="chartBar" size={18} />{t.planner.statistics}</h3>
               {selectedFamily && familyUsers.length > 0 && (
                 <>
                   <div className={styles.statsGrid}>
@@ -5325,19 +5353,19 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       <span className={styles.statValue}>
                         {getFamilyLeaderboard().reduce((sum, u) => sum + u.totalPoints, 0)}
                       </span>
-                      <span className={styles.statLabel}>Points totaux famille</span>
+                      <span className={styles.statLabel}>{t.planner.totalFamilyPoints}</span>
                     </div>
                     <div className={styles.statItem}>
                       <span className={styles.statValue}>
                         {getFamilyLeaderboard().reduce((sum, u) => sum + u.validatedCount, 0)}
                       </span>
-                      <span className={styles.statLabel}>Tâches validées</span>
+                      <span className={styles.statLabel}>{t.planner.validatedTasks}</span>
                     </div>
                     <div className={styles.statItem}>
                       <span className={styles.statValue}>
                         {Math.round(getFamilyLeaderboard().reduce((sum, u) => sum + u.totalPoints, 0) / Math.max(getActiveMembers().length, 1))}
                       </span>
-                      <span className={styles.statLabel}>Moyenne par membre actif</span>
+                      <span className={styles.statLabel}>{t.planner.averagePerActive}</span>
                     </div>
                   </div>
                 </>
@@ -5353,7 +5381,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           <div className={styles.historyModalContent} onClick={e => e.stopPropagation()} style={{ maxWidth: '500px' }}>
             <button className={styles.closeModal} onClick={() => setShowQuotaExplain(false)}>×</button>
             <div className={styles.historyModalHeader}>
-              <h4><Icon name="help" size={20} /> Comment sont calculés vos objectifs ?</h4>
+              <h4><Icon name="help" size={20} /> {t.planner.howGoalsCalculated}</h4>
             </div>
             <div className={styles.historyModalBody} style={{ padding: '16px' }}>
               {/* Calcul détaillé */}
@@ -5363,16 +5391,16 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 <div style={{ background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: '8px' }}>
                   <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ background: 'var(--color-primary)', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>1</span>
-                    Points disponibles cette semaine
+                    {t.planner.availablePointsWeek}
                   </div>
                   <div style={{ marginLeft: '28px', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                    On additionne les points de toutes les tâches × leur fréquence hebdomadaire
+                    {t.planner.addAllPointsDesc}
                   </div>
                   <div style={{ marginLeft: '28px', marginTop: '8px', fontWeight: 600, color: 'var(--color-primary)' }}>
-                    = {getWeeklyAvailablePoints()} points au total
+                    = {getWeeklyAvailablePoints()} {t.planner.pointsInTotal}
                   </div>
                   <div style={{ marginLeft: '28px', marginTop: '4px', fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                    ({familyTasks.length} tâche{familyTasks.length > 1 ? 's' : ''} configurée{familyTasks.length > 1 ? 's' : ''})
+                    ({familyTasks.length} {familyTasks.length > 1 ? t.planner.tasksConfigured : t.planner.taskConfigured})
                   </div>
                 </div>
 
@@ -5380,10 +5408,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 <div style={{ background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: '8px' }}>
                   <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ background: 'var(--color-primary)', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>2</span>
-                    Quota par personne
+                    {t.planner.quotaPerPerson}
                   </div>
                   <div style={{ marginLeft: '28px', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                    {getWeeklyAvailablePoints()} pts ÷ {getActiveMembers().length} membre{getActiveMembers().length > 1 ? 's' : ''} actif{getActiveMembers().length > 1 ? 's' : ''}
+                    {getWeeklyAvailablePoints()} pts ÷ {getActiveMembers().length} {getActiveMembers().length > 1 ? t.planner.membersActive : t.planner.memberActive}
                     {getActiveMembers().length < familyUsers.length && (
                       <span style={{ color: 'var(--color-text-muted)', fontSize: '12px', marginLeft: '4px' }}>
                         ({familyUsers.length - getActiveMembers().length} désactivé{familyUsers.length - getActiveMembers().length > 1 ? 's' : ''})
@@ -5391,7 +5419,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     )}
                   </div>
                   <div style={{ marginLeft: '28px', marginTop: '8px', fontWeight: 600, color: 'var(--color-primary)' }}>
-                    = {getWeeklyQuotaPerPerson()} points par personne
+                    = {getWeeklyQuotaPerPerson()} {t.planner.ptsPerPerson}
                   </div>
                 </div>
 
@@ -5399,11 +5427,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 <div style={{ background: 'var(--color-bg-subtle)', padding: '12px', borderRadius: '8px' }}>
                   <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                     <span style={{ background: 'var(--color-primary)', color: 'white', borderRadius: '50%', width: '20px', height: '20px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '12px' }}>3</span>
-                    Ajustements personnels
+                    {t.planner.personalAdjustments}
                   </div>
                   <div style={{ marginLeft: '28px', fontSize: '14px', color: 'var(--color-text-secondary)' }}>
-                    <div>• <strong>Absences :</strong> Si vous avez un événement "toute la journée", votre quota diminue proportionnellement</div>
-                    <div style={{ marginTop: '4px' }}>• <strong>Report :</strong> Si vous avez fait plus/moins que votre quota la semaine dernière, la différence est reportée</div>
+                    <div>• {t.planner.absencesHelp}</div>
+                    <div style={{ marginTop: '4px' }}>• {t.planner.carryoverHelp}</div>
                   </div>
                 </div>
 
@@ -5412,10 +5440,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   <div style={{ background: 'var(--color-primary-subtle)', padding: '12px', borderRadius: '8px', border: '1px solid var(--color-primary)' }}>
                     <div style={{ fontWeight: 600, marginBottom: '8px', display: 'flex', alignItems: 'center', gap: '8px' }}>
                       <Icon name="user" size={16} />
-                      Votre objectif cette semaine
+                      {t.planner.yourGoalWeek}
                     </div>
                     <div style={{ marginLeft: '24px', fontSize: '14px' }}>
-                      <div>Quota de base : {getWeeklyQuotaPerPerson()} pts</div>
+                      <div>{t.planner.baseQuota} : {getWeeklyQuotaPerPerson()} pts</div>
                       {getUserAbsenceDaysForWeek(currentUser, getWeekStart(new Date())) > 0 && (
                         <div style={{ color: 'var(--color-warning)' }}>
                           − {Math.round(getWeeklyQuotaPerPerson() * getUserAbsenceDaysForWeek(currentUser, getWeekStart(new Date())) / 7)} pts (absence {getUserAbsenceDaysForWeek(currentUser, getWeekStart(new Date()))}j)
@@ -5423,15 +5451,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       )}
                       {getLastWeekBalance(currentUser) !== 0 && (
                         <div style={{ color: getLastWeekBalance(currentUser) > 0 ? 'var(--color-success)' : 'var(--color-error)' }}>
-                          {getLastWeekBalance(currentUser) > 0 ? '−' : '+'} {Math.abs(getLastWeekBalance(currentUser))} pts (report sem. dernière)
+                          {getLastWeekBalance(currentUser) > 0 ? '−' : '+'} {Math.abs(getLastWeekBalance(currentUser))} {t.common.pts} ({t.planner.lastWeekCarryover})
                         </div>
                       )}
                       <div style={{ marginTop: '8px', fontWeight: 700, fontSize: '16px', color: 'var(--color-primary)' }}>
-                        = {getAdjustedQuota(currentUser)} pts à faire cette semaine
+                        = {getAdjustedQuota(currentUser)} {t.planner.ptsToDoWeek}
                       </div>
                       <div style={{ marginTop: '4px', fontSize: '13px', color: 'var(--color-text-secondary)' }}>
-                        Déjà fait : {getUserPointsForWeek(currentUser, getWeekStart(new Date()))} pts • 
-                        Reste : {getRemainingQuota(currentUser)} pts
+                        {t.planner.alreadyDone} : {getUserPointsForWeek(currentUser, getWeekStart(new Date()))} pts •
+                        {t.planner.rest} : {getRemainingQuota(currentUser)} pts
                       </div>
                     </div>
                   </div>
@@ -5441,7 +5469,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 {currentUser && (
                   <details style={{ marginTop: '8px' }}>
                     <summary style={{ cursor: 'pointer', fontWeight: 500, color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-                      📊 Détail semaine dernière {getLastWeekBalance(currentUser) !== 0 ? `(report de ${Math.abs(getLastWeekBalance(currentUser))} pts)` : '(pas de report)'}
+                      📊 {t.planner.lastWeekDetails} {getLastWeekBalance(currentUser) !== 0 ? `(${t.planner.carryoverOf} ${Math.abs(getLastWeekBalance(currentUser))} pts)` : `(${t.planner.noCarryover})`}
                     </summary>
                     <div style={{ marginTop: '8px', padding: '12px', background: 'var(--color-bg-subtle)', borderRadius: '8px', fontSize: '13px' }}>
                       {(() => {
@@ -5468,16 +5496,16 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         return (
                           <>
                             <div style={{ marginBottom: '8px', color: 'var(--color-text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                              <span>Semaine du {lastWeekStart.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} au {lastWeekEnd.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}</span>
+                              <span>{t.planner.weekOfShort} {lastWeekStart.toLocaleDateString(locale, { day: 'numeric', month: 'short' })} - {lastWeekEnd.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}</span>
                               {isFromHistory && (
-                                <span style={{ fontSize: '11px', background: 'var(--color-success)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>✓ Historique</span>
+                                <span style={{ fontSize: '11px', background: 'var(--color-success)', color: 'white', padding: '2px 6px', borderRadius: '4px' }}>✓ {t.planner.history}</span>
                               )}
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span>Points gagnés : <strong>{pointsLastWeek}</strong> pts</span>
+                              <span>{t.planner.pointsEarned} : <strong>{pointsLastWeek}</strong> {t.common.pts}</span>
                               <button
                                 onClick={() => {
-                                  const newPoints = prompt(`Corriger les points gagnés la semaine dernière (actuellement ${pointsLastWeek}) :`, String(pointsLastWeek));
+                                  const newPoints = prompt(`${t.planner.correctPointsPrompt} (${pointsLastWeek}) :`, String(pointsLastWeek));
                                   if (newPoints && !isNaN(Number(newPoints))) {
                                     setWeeklyHistory(prev => {
                                       const filtered = prev.filter(h => !(h.userId === currentUser && h.weekStart === lastWeekKey));
@@ -5501,14 +5529,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                   color: 'var(--color-text-muted)'
                                 }}
                               >
-                                ✏️ Corriger
+                                ✏️ {t.planner.correct}
                               </button>
                             </div>
                             <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span>Quota attendu : <strong>{quotaLastWeek}</strong> pts</span>
+                              <span>{t.planner.expectedQuota} : <strong>{quotaLastWeek}</strong> pts</span>
                               <button
                                 onClick={() => {
-                                  const newQuota = prompt(`Corriger le quota de la semaine dernière (actuellement ${quotaLastWeek}) :`, String(quotaLastWeek));
+                                  const newQuota = prompt(`${t.planner.correctQuotaPrompt} (${quotaLastWeek}) :`, String(quotaLastWeek));
                                   if (newQuota && !isNaN(Number(newQuota))) {
                                     setWeeklyHistory(prev => {
                                       const filtered = prev.filter(h => !(h.userId === currentUser && h.weekStart === lastWeekKey));
@@ -5532,21 +5560,21 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                   color: 'var(--color-text-muted)'
                                 }}
                               >
-                                ✏️ Corriger
+                                ✏️ {t.planner.correct}
                               </button>
                             </div>
                             <div style={{ marginTop: '4px', fontWeight: 600, color: pointsLastWeek >= quotaLastWeek ? 'var(--color-success)' : 'var(--color-error)' }}>
-                              Balance : {pointsLastWeek} - {quotaLastWeek} = {pointsLastWeek - quotaLastWeek} pts
+                              {t.planner.balanceLabel} : {pointsLastWeek} - {quotaLastWeek} = {pointsLastWeek - quotaLastWeek} pts
                             </div>
                             {!isFromHistory && (
                               <div style={{ marginTop: '8px', padding: '8px', background: 'var(--color-warning)', borderRadius: '4px', fontSize: '12px', color: 'white' }}>
-                                ⚠️ Ces valeurs sont estimées. Cliquez sur "Corriger" pour entrer le quota réel de cette semaine-là.
+                                ⚠️ {t.planner.estimatedWarning}
                               </div>
                             )}
                             {isFromHistory && (
                               <button
                                 onClick={() => {
-                                  if (confirm('Supprimer cet historique ? Les valeurs seront recalculées à partir des données actuelles.')) {
+                                  if (confirm(t.planner.deleteHistoryConfirm)) {
                                     setWeeklyHistory(prev => prev.filter(h => !(h.userId === currentUser && h.weekStart === lastWeekKey)));
                                   }
                                 }}
@@ -5561,13 +5589,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                   color: 'white'
                                 }}
                               >
-                                🗑️ Supprimer cet historique
+                                🗑️ {t.planner.deleteHistory}
                               </button>
                             )}
                             {isFromHistory && calculatedPoints !== pointsLastWeek && (
                               <div style={{ marginTop: '8px', padding: '8px', background: 'var(--color-primary-subtle)', borderRadius: '4px', fontSize: '12px' }}>
                                 <div style={{ marginBottom: '4px' }}>
-                                  💡 Points calculés actuellement : <strong>{calculatedPoints}</strong> pts (différent de l'historique)
+                                  💡 {t.planner.calculatedPointsNote} : <strong>{calculatedPoints}</strong> pts ({t.planner.differenceNote})
                                 </div>
                                 <button
                                   onClick={() => {
@@ -5592,7 +5620,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                     color: 'white'
                                   }}
                                 >
-                                  🔄 Mettre à jour avec {calculatedPoints} pts
+                                  🔄 {t.planner.updateWith} {calculatedPoints} pts
                                 </button>
                               </div>
                             )}
@@ -5600,7 +5628,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             {/* Liste des tâches validées la semaine dernière */}
                             <details style={{ marginTop: '12px' }}>
                               <summary style={{ cursor: 'pointer', fontSize: '12px', color: 'var(--color-text-muted)' }}>
-                                📋 Détail des tâches détectées ({validatedTasks.filter(v => {
+                                📋 {t.planner.taskDetailsDetected} ({validatedTasks.filter(v => {
                                   if (v.userId !== currentUser || !v.validated) return false;
                                   const [year, month, day] = v.date.split('-').map(Number);
                                   const taskDate = new Date(year, month - 1, day).getTime();
@@ -5621,7 +5649,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                     const localDate = new Date(year, month - 1, day);
                                     return (
                                       <div key={i} style={{ padding: '4px 0', borderBottom: '1px solid var(--color-border)' }}>
-                                        <strong>{task?.title || 'Tâche inconnue'}</strong> - {localDate.toLocaleDateString('fr-FR')}
+                                        <strong>{task?.title || t.planner.unknownTask}</strong> - {localDate.toLocaleDateString(locale)}
                                         {task && <span style={{ color: 'var(--color-success)' }}> (+{calculateTaskPoints(task)} pts)</span>}
                                       </div>
                                     );
@@ -5638,7 +5666,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                     const localDate = new Date(year, month - 1, day);
                                     return (
                                       <div key={`exc-${i}`} style={{ padding: '4px 0', borderBottom: '1px solid var(--color-border)' }}>
-                                        <strong>⭐ {t.title}</strong> - {localDate.toLocaleDateString('fr-FR')}
+                                        <strong>⭐ {t.title}</strong> - {localDate.toLocaleDateString(locale)}
                                         <span style={{ color: 'var(--color-success)' }}> (+{calculateExceptionalPoints(t)} pts)</span>
                                       </div>
                                     );
@@ -5655,7 +5683,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                   return taskDate >= lastWeekStart.getTime() && taskDate < lastWeekStart.getTime() + 7 * 24 * 60 * 60 * 1000;
                                 }).length === 0 && (
                                   <div style={{ color: 'var(--color-text-muted)', fontStyle: 'italic' }}>
-                                    Aucune tâche validée détectée pour cette période
+                                    {t.planner.noValidatedTasks}
                                   </div>
                                 )}
                               </div>
@@ -5670,7 +5698,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 {/* Détail des tâches */}
                 <details style={{ marginTop: '8px' }}>
                   <summary style={{ cursor: 'pointer', fontWeight: 500, color: 'var(--color-text-secondary)', fontSize: '14px' }}>
-                    Voir le détail des tâches ({familyTasks.length})
+                    {t.planner.viewTaskDetails} ({familyTasks.length})
                   </summary>
                   <div style={{ marginTop: '8px', maxHeight: '200px', overflowY: 'auto' }}>
                     {familyTasks.map(task => {
@@ -5705,14 +5733,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           <div className={styles.historyModalContent} onClick={e => e.stopPropagation()}>
             <button className={styles.closeModal} onClick={() => setPointsHistoryModal(null)}>×</button>
             <div className={styles.historyModalHeader}>
-              <h4><Icon name="trophy" size={20} /> Historique de {pointsHistoryModal.userName}</h4>
+              <h4><Icon name="trophy" size={20} /> {t.planner.historyOf} {pointsHistoryModal.userName}</h4>
               <p className={styles.historyTotalPoints}>
                 Total : <strong>{getUserTotalPoints(pointsHistoryModal.userId)} points</strong>
               </p>
             </div>
             <div className={styles.historyModalBody}>
               {getUserPointsHistory(pointsHistoryModal.userId).length === 0 ? (
-                <p className={styles.emptyHistory}>Aucun point gagné pour le moment</p>
+                <p className={styles.emptyHistory}>{t.planner.noPointsYet}</p>
               ) : (
                 <div className={styles.historyList}>
                   {getUserPointsHistory(pointsHistoryModal.userId).map(item => (
@@ -5724,7 +5752,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         <div className={styles.historyItemInfo}>
                           <span className={styles.historyItemTitle}>{item.title}</span>
                           <span className={styles.historyItemDate}>
-                            {new Date(item.date).toLocaleDateString('fr-FR', {
+                            {new Date(item.date).toLocaleDateString(locale, {
                               weekday: 'short',
                               day: 'numeric',
                               month: 'short'
@@ -5767,7 +5795,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
   const getWeekRange = (start: Date) => {
     const end = new Date(start);
     end.setDate(end.getDate() + 6);
-    return `${start.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })} - ${end.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`;
+    return `${start.toLocaleDateString(locale, { day: 'numeric', month: 'short' })} - ${end.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}`;
   };
 
   const getDayTasks = (day: Date) => {
@@ -5821,10 +5849,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 <h1 className={styles.mobileTitle}>{tabs.find(t => t.id === activeTab)?.shortLabel}</h1>
               </div>
               <div className={styles.mobileActions}>
-                <button className={styles.mobileIconBtn} onClick={() => setShowSuggestionModal(true)} title="Proposer une idée">
+                <button className={styles.mobileIconBtn} onClick={() => setShowSuggestionModal(true)} title={t.planner.suggestIdea}>
                   <Icon name="lightbulb" size={20} />
                 </button>
-                <Link href="/settings" className={styles.mobileIconBtn} title="Paramètres">
+                <Link href="/settings" className={styles.mobileIconBtn} title={t.common.settings}>
                   <Icon name="gear" size={20} />
                 </Link>
               </div>
@@ -5837,7 +5865,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   {/* Points Card - Compact */}
                   <div className={styles.mobilePointsCard}>
                     <div className={styles.mobilePointsInfo}>
-                      <span className={styles.mobilePointsLabel}>Mes points</span>
+                      <span className={styles.mobilePointsLabel}>{t.planner.myPoints}</span>
                       <span className={styles.mobilePointsValue}>{getMyTotalPoints()}</span>
                     </div>
                     <div className={styles.mobilePointsIcon}>
@@ -5849,15 +5877,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   <div className={styles.mobileQuickStats}>
                     <div className={styles.mobileStatCard}>
                       <span className={styles.mobileStatValue}>{getMyUpcomingTasks().length}</span>
-                      <span className={styles.mobileStatLabel}>À faire</span>
+                      <span className={styles.mobileStatLabel}>{t.planner.toDo}</span>
                     </div>
                     <div className={styles.mobileStatCard}>
                       <span className={styles.mobileStatValue}>{getMyPastTasks().filter(t => !t.validated).length}</span>
-                      <span className={styles.mobileStatLabel}>À valider</span>
+                      <span className={styles.mobileStatLabel}>{t.planner.toValidate}</span>
                     </div>
                     <div className={styles.mobileStatCard}>
                       <span className={styles.mobileStatValue}>{currentUser ? getUserPointsHistory(currentUser).length : 0}</span>
-                      <span className={styles.mobileStatLabel}>Cette sem.</span>
+                      <span className={styles.mobileStatLabel}>{t.planner.thisWeekShort}</span>
                     </div>
                   </div>
 
@@ -5866,7 +5894,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     <div className={styles.mobileSection}>
                       <h3 className={styles.mobileSectionTitle}>
                         <Icon name="clipboardList" size={16} />
-                        Prochaines tâches
+                        {t.planner.upcomingTasks}
                       </h3>
                       <div className={styles.mobileTaskList}>
                         {getMyUpcomingTasks().slice(0, 4).map((item, idx) => {
@@ -5875,10 +5903,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           return (
                           <div key={`mobile-task-${idx}`} className={styles.mobileTaskItem}>
                             <div className={styles.mobileTaskLeft}>
-                              <span className={styles.mobileTaskTitle}>{item.task.title}{item.task.isRecurring && <span className={styles.recurringBadge} title="Récurrente"> ↻</span>}</span>
+                              <span className={styles.mobileTaskTitle}>{item.task.title}{item.task.isRecurring && <span className={styles.recurringBadge} title={t.planner.recurring}> ↻</span>}</span>
                               {mobileMyDish && <span className={styles.dishLabel}>{mobileMyDish}</span>}
                               <span className={styles.mobileTaskMeta}>
-                                {item.date.toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric' })} · {formatTimeDisplay(item.timeSlot)}
+                                {item.date.toLocaleDateString(locale, { weekday: 'short', day: 'numeric' })} · {formatTimeDisplay(item.timeSlot)}
                               </span>
                             </div>
                             <span className={styles.mobileTaskPoints}>+{item.points}</span>
@@ -5887,7 +5915,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         })}
                         {getMyUpcomingTasks().length > 4 && (
                           <button className={styles.mobileShowMore}>
-                            Voir tout ({getMyUpcomingTasks().length})
+                            {t.planner.seeAll} ({getMyUpcomingTasks().length})
                           </button>
                         )}
                       </div>
@@ -5899,7 +5927,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     <div className={styles.mobileSection}>
                       <h3 className={styles.mobileSectionTitle} style={{ color: 'var(--color-warning)' }}>
                         <Icon name="clock" size={16} />
-                        À valider
+                        {t.planner.toValidate}
                       </h3>
                       <div className={styles.mobileTaskList}>
                         {/* Delegated tasks from others */}
@@ -5908,7 +5936,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             <div className={styles.mobileTaskLeft}>
                               <span className={styles.mobileTaskTitle}>{item.task.title}</span>
                               <span className={styles.mobileTaskMeta} style={{ color: 'var(--color-primary)' }}>
-                                Délégué par {item.delegatorName}
+                                {t.planner.delegatedBy} {item.delegatorName}
                               </span>
                             </div>
                             <div className={styles.mobileValidateBtns}>
@@ -5927,7 +5955,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             <div className={styles.mobileTaskLeft}>
                               <span className={styles.mobileTaskTitle}>{item.task.title}</span>
                               <span className={styles.mobileTaskMeta}>
-                                {item.date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                                {item.date.toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                               </span>
                             </div>
                             <div className={styles.mobileValidateBtns}>
@@ -5959,7 +5987,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       >
                         <div className={styles.mobileHistoryToggleLeft}>
                           <Icon name="check" size={16} />
-                          <span>Historique ({getUserPointsHistory(currentUser).length + getMyDelegatedTasks().length})</span>
+                          <span>{t.planner.history} ({getUserPointsHistory(currentUser).length + getMyDelegatedTasks().length})</span>
                         </div>
                         <Icon name={mobileHistoryOpen ? "chevronDown" : "chevronRight"} size={16} />
                       </button>
@@ -5970,7 +5998,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               <div className={styles.mobileTaskLeft}>
                                 <span className={styles.mobileTaskTitle}>{item.title}</span>
                                 <span className={styles.mobileTaskMeta}>
-                                  {new Date(item.date).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}
+                                  {new Date(item.date).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}
                                 </span>
                               </div>
                               <div className={styles.mobileHistoryRight}>
@@ -5983,7 +6011,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                       validateTask(task.id, new Date(item.date), false);
                                     }
                                   }}
-                                  title="Annuler la validation"
+                                  title={t.planner.cancelValidation}
                                 >
                                   <Icon name="x" size={12} />
                                 </button>
@@ -5996,14 +6024,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               <div className={styles.mobileTaskLeft}>
                                 <span className={styles.mobileTaskTitle}>{item.task.title}</span>
                                 <span className={styles.mobileTaskMeta} style={{ color: item.delegatedToName ? 'var(--color-primary)' : 'var(--color-text-muted)' }}>
-                                  {item.delegatedToName ? `Fait par ${item.delegatedToName}` : 'Non fait'}
+                                  {item.delegatedToName ? `${t.planner.doneBy} ${item.delegatedToName}` : t.planner.notDone}
                                 </span>
                               </div>
                               <div className={styles.mobileHistoryRight}>
                                 <button
                                   className={styles.mobileCancelValidationBtn}
                                   onClick={() => undelegateTask(item.task.id, item.date)}
-                                  title="Annuler la délégation"
+                                  title={t.planner.cancelDelegation}
                                 >
                                   <Icon name="x" size={12} />
                                 </button>
@@ -6023,7 +6051,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     >
                       <div className={styles.mobileExceptionalToggleLeft}>
                         <Icon name="star" size={16} />
-                        <span>Tâche exceptionnelle</span>
+                        <span>{t.planner.exceptionalTask}</span>
                       </div>
                       <Icon name={mobileShowExceptionalForm ? "chevronDown" : "plus"} size={16} />
                     </button>
@@ -6032,13 +6060,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         <input
                           type="text"
                           className={styles.mobileInput}
-                          placeholder="Nom de la tâche"
+                          placeholder={t.planner.taskName}
                           value={newExceptionalTask.title}
                           onChange={(e) => setNewExceptionalTask(prev => ({ ...prev, title: e.target.value }))}
                         />
                         <div className={styles.mobileInputRowEqual}>
                           <div className={styles.mobileInputGroupCompact}>
-                            <label>Durée</label>
+                            <label>{t.planner.durationLabel}</label>
                             <div className={styles.mobileInputWithUnit}>
                               <input
                                 type="number"
@@ -6051,7 +6079,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             </div>
                           </div>
                           <div className={styles.mobileInputGroupCompact}>
-                            <label>Pénibilité</label>
+                            <label>{t.planner.penibilityShort}</label>
                             <div className={styles.mobileInputWithUnit}>
                               <input
                                 type="number"
@@ -6068,7 +6096,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           <span className={styles.mobileExceptionalPoints}>
                             +{Math.round((newExceptionalTask.duration * newExceptionalTask.penibility) / 10)} pts
                           </span>
-                          <button 
+                          <button
                             className={styles.mobileCreateBtnSmall}
                             onClick={() => {
                               addExceptionalTask();
@@ -6077,7 +6105,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             disabled={!newExceptionalTask.title.trim()}
                           >
                             <Icon name="plus" size={14} />
-                            Ajouter
+                            {t.common.add}
                           </button>
                         </div>
                       </div>
@@ -6107,7 +6135,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     className={`${styles.mobileAutoAssignBtn} ${isAllWeekAssigned ? styles.mobileAutoAssignBtnDone : ''}`}
                   >
                     <Icon name="sparkles" size={16} />
-                    Auto-attribution
+                    {t.planner.autoAssignLabel}
                   </button>
 
                   {/* Day Pills */}
@@ -6122,7 +6150,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           className={`${styles.mobileDayPill} ${isSelected ? styles.mobileDayPillSelected : ''} ${isToday && !isSelected ? styles.mobileDayPillToday : ''}`}
                           onClick={() => setSelectedMobileDay(day)}
                         >
-                          <span className={styles.mobileDayName}>{day.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
+                          <span className={styles.mobileDayName}>{day.toLocaleDateString(locale, { weekday: 'short' })}</span>
                           <span className={styles.mobileDayNum}>{day.getDate()}</span>
                           {dayTasks.length > 0 && <span className={styles.mobileDayDot}></span>}
                         </button>
@@ -6133,11 +6161,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   {/* Selected Day Tasks */}
                   <div className={styles.mobileSection}>
                     <h3 className={styles.mobileSectionTitle}>
-                      {(selectedMobileDay || new Date()).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                      {(selectedMobileDay || new Date()).toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
                     </h3>
                     <div className={styles.mobileTaskList}>
                       {getDayTasks(selectedMobileDay || new Date()).length === 0 ? (
-                        <p className={styles.mobileEmptyState}>Aucune tâche ce jour</p>
+                        <p className={styles.mobileEmptyState}>{t.planner.noTasksThisDay}</p>
                       ) : (
                         getDayTasks(selectedMobileDay || new Date()).map((item, idx) => {
                           const currentDay = selectedMobileDay || new Date();
@@ -6163,9 +6191,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                   style={{ backgroundColor: isAssigned ? `hsl(${(users.findIndex(u => u.id === firstAssignedUser) * 60) % 360}, 60%, 50%)` : 'var(--color-muted)' }}
                                 />
                                 <div className={styles.mobileTaskLeft}>
-                                  <span className={styles.mobileTaskTitle}>{item.task.title}{item.task.isRecurring && <span className={styles.recurringBadge} title="Récurrente"> ↻</span>}</span>
+                                  <span className={styles.mobileTaskTitle}>{item.task.title}{item.task.isRecurring && <span className={styles.recurringBadge} title={t.planner.recurring}> ↻</span>}</span>
                                   <span className={styles.mobileTaskMeta}>
-                                    {formatTimeDisplay(item.timeSlot)} · {isAssigned ? assignedNames || 'Inconnu' : 'Libre'}
+                                    {formatTimeDisplay(item.timeSlot)} · {isAssigned ? assignedNames || t.planner.unknownUser : t.planner.freeSlot}
                                   </span>
                                 </div>
                                 <span className={styles.mobileTaskPoints}>+{displayPoints}{assignedUserIds.length > 1 && isMyTask ? ` (÷${assignedUserIds.length})` : ''}</span>
@@ -6177,25 +6205,25 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                     onClick={() => unclaimTask(item.task.id, currentDay)}
                                   >
                                     <Icon name="x" size={14} />
-                                    Se désinscrire
+                                    {t.planner.unregister}
                                   </button>
                                 ) : iAmBusy ? (
                                   <span className={styles.mobileBusyLabel}>
                                     <Icon name="clock" size={14} />
-                                    Occupé(e)
+                                    {t.planner.busy}
                                   </span>
                                 ) : (
-                                  <button 
+                                  <button
                                     className={styles.mobileRegisterBtn}
                                     onClick={() => claimTask(item.task.id, currentDay)}
                                   >
                                     <Icon name="check" size={14} />
-                                    {isAssigned ? 'Rejoindre' : "S'inscrire"}
+                                    {isAssigned ? t.planner.register : t.planner.register}
                                   </button>
                                 )}
                                 {isAssigned && !isMyTask && (
                                   <span className={styles.mobileAssignedLabel}>
-                                    Pris par {assignedNames}
+                                    {t.planner.takenBy} {assignedNames}
                                   </span>
                                 )}
                                 {currentUserRecord?.isAdmin && (() => {
@@ -6210,13 +6238,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                             prev?.key === mobileTaskKey ? null : { taskId: item.task.id, date: currentDay, key: mobileTaskKey }
                                           );
                                         }}
-                                        title="Gérer l'inscription"
+                                        title={t.planner.manageRegistration}
                                       >
                                         <Icon name="users" size={14} />
                                       </button>
                                       {adminAssignMenu?.key === mobileTaskKey && (
                                         <div className={styles.adminAssignDropdown}>
-                                          <div className={styles.adminAssignHeader}>Inscrire un membre</div>
+                                          <div className={styles.adminAssignHeader}>{t.planner.assignMember}</div>
                                           {familyUsers.filter(u => u.familyId === selectedFamily).map(member => {
                                             const isMemberAssigned = assignedUserIds.includes(member.id);
                                             return (
@@ -6256,7 +6284,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     <div className={styles.mobileGoalCard}>
                       <div className={styles.mobileGoalHeader}>
                         <Icon name="listCheck" size={18} />
-                        <span>Objectif hebdomadaire</span>
+                        <span>{t.planner.weeklyGoal}</span>
                       </div>
                       <div className={styles.mobileGoalProgress}>
                         <div className={styles.mobileGoalValues}>
@@ -6280,8 +6308,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         <div className={styles.mobileGoalDetails}>
                           <span>
                             {getUserPointsForWeek(currentUser, getWeekStart(new Date())) >= getQuotaWithAbsences(currentUser, getWeekStart(new Date())) 
-                              ? <><Icon name="check" size={14} style={{ color: 'var(--color-success)', marginRight: '4px' }} />Objectif atteint !</>
-                              : `${getQuotaWithAbsences(currentUser, getWeekStart(new Date())) - getUserPointsForWeek(currentUser, getWeekStart(new Date()))} pts restants`
+                              ? <><Icon name="check" size={14} style={{ color: 'var(--color-success)', marginRight: '4px' }} />{t.planner.goalReached}</>
+                              : `${getQuotaWithAbsences(currentUser, getWeekStart(new Date())) - getUserPointsForWeek(currentUser, getWeekStart(new Date()))} ${t.planner.remaining}`
                             }
                           </span>
                         </div>
@@ -6293,14 +6321,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   <div className={styles.mobileLeaderboard}>
                     <div className={styles.rankingFilters}>
                       <div className={styles.rankingFilterGroup}>
-                        <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'week' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('week')}>Semaine</button>
-                        <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'month' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('month')}>Mois</button>
-                        <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'all' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('all')}>Toujours</button>
+                        <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'week' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('week')}>{t.planner.week}</button>
+                        <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'month' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('month')}>{t.planner.month}</button>
+                        <button className={`${styles.rankingFilterBtn} ${rankingPeriod === 'all' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingPeriod('all')}>{t.planner.allTime}</button>
                       </div>
                       <div className={styles.rankingFilterGroup}>
-                        <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'points' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('points')}>Points</button>
-                        <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'tasks' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('tasks')}>Tâches</button>
-                        <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'time' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('time')}>Temps</button>
+                        <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'points' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('points')}>{t.common.pts}</button>
+                        <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'tasks' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('tasks')}>{t.common.tasks}</button>
+                        <button className={`${styles.rankingFilterBtn} ${rankingMetric === 'time' ? styles.rankingFilterActive : ''}`} onClick={() => setRankingMetric('time')}>{t.planner.timeLabel}</button>
                       </div>
                     </div>
                     {getFilteredLeaderboard().map((user, idx) => (
@@ -6316,7 +6344,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         >
                           {user.name.charAt(0)}
                         </div>
-                        <span className={styles.mobileLeaderName}>{user.name} {user.id === currentUser && '(moi)'}</span>
+                        <span className={styles.mobileLeaderName}>{user.name} {user.id === currentUser && <span className={styles.meBadge}>{t.common.me}</span>}</span>
                         <span className={styles.mobileLeaderPoints}>{formatMetricValue(user.value)}</span>
                       </button>
                     ))}
@@ -6339,13 +6367,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       </div>
                       <div className={styles.mobileActivityList}>
                         {getUserPointsHistory(mobileSelectedUser).length === 0 ? (
-                          <p className={styles.mobileEmptyState}>Aucune activité</p>
+                          <p className={styles.mobileEmptyState}>{t.planner.noActivity}</p>
                         ) : (
                           getUserPointsHistory(mobileSelectedUser).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).slice(0, 10).map((item, idx) => (
                             <div key={idx} className={styles.mobileActivityItem}>
                               <div className={styles.mobileActivityInfo}>
                                 <span className={styles.mobileActivityTitle}>{item.title}</span>
-                                <span className={styles.mobileActivityMeta}>{new Date(item.date).toLocaleDateString('fr-FR', { weekday: 'short', day: 'numeric', month: 'short' })}</span>
+                                <span className={styles.mobileActivityMeta}>{new Date(item.date).toLocaleDateString(locale, { weekday: 'short', day: 'numeric', month: 'short' })}</span>
                               </div>
                               <span className={styles.mobileActivityPoints}>+{item.points}</span>
                             </div>
@@ -6366,7 +6394,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       <Icon name="search" size={16} />
                       <input 
                         type="text" 
-                        placeholder="Rechercher une tâche..."
+                        placeholder={t.planner.searchTask}
                         value={taskSearch}
                         onChange={(e) => setTaskSearch(e.target.value)}
                       />
@@ -6384,18 +6412,18 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     <div className={styles.mobileCreateTaskCard}>
                       <h4 className={styles.mobileCreateTitle}>
                         <Icon name="plus" size={14} />
-                        Nouvelle tâche
+                        {t.planner.newTask}
                       </h4>
                       <input
                         type="text"
                         className={styles.mobileInput}
-                        placeholder="Nom de la tâche"
+                        placeholder={t.planner.taskName}
                         value={newTask.title}
                         onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
                       />
                       <div className={styles.mobileInputRowEqual}>
                         <div className={styles.mobileInputGroupCompact}>
-                          <label>Durée</label>
+                          <label>{t.planner.durationLabel}</label>
                           <div className={styles.mobileInputWithUnit}>
                             <input
                               type="number"
@@ -6408,7 +6436,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           </div>
                         </div>
                         <div className={styles.mobileInputGroupCompact}>
-                          <label>Pénibilité</label>
+                          <label>{t.planner.penibilityShort}</label>
                           <div className={styles.mobileInputWithUnit}>
                             <input
                               type="number"
@@ -6424,14 +6452,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       
                       {/* Schedule slots */}
                       <div className={styles.mobileScheduleSection}>
-                        <label className={styles.mobileScheduleLabel}>Créneaux</label>
+                        <label className={styles.mobileScheduleLabel}>{t.planner.slots}</label>
                         <div className={styles.mobileScheduleAdd}>
                           <select
                             className={styles.mobileSelectCompact}
                             value={newTaskDay}
                             onChange={(e) => setNewTaskDay(e.target.value)}
                           >
-                            {dayOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                            {dayOptions.map(d => <option key={d} value={d}>{translateDay(d)}</option>)}
                           </select>
                           <button
                             type="button"
@@ -6445,7 +6473,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 setNewTaskTime("Matin");
                               }
                             }}
-                            title={newTaskTimeMode === "slot" ? "Passer en heure précise" : "Passer en créneau"}
+                            title={newTaskTimeMode === "slot" ? t.planner.switchExactTime : t.planner.switchSlot}
                           >
                             <Icon name="clock" size={14} />
                           </button>
@@ -6455,9 +6483,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               value={newTaskTime}
                               onChange={(e) => setNewTaskTime(e.target.value)}
                             >
-                              <option value="Matin">Matin</option>
-                              <option value="Après-midi">Après-midi</option>
-                              <option value="Soir">Soir</option>
+                              {timeSlotOptions.map((ts) => (
+                                <option key={ts} value={ts}>{translateTime(ts)}</option>
+                              ))}
                             </select>
                           ) : (
                             <input
@@ -6483,7 +6511,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                           <div className={styles.mobileScheduleList}>
                             {mobileNewTaskSchedules.map((slot, idx) => (
                               <div key={idx} className={styles.mobileScheduleChip}>
-                                <span>{slot}</span>
+                                <span>{translateSlot(slot)}</span>
                                 <button onClick={() => setMobileNewTaskSchedules(mobileNewTaskSchedules.filter((_, i) => i !== idx))}>
                                   <Icon name="x" size={10} />
                                 </button>
@@ -6500,7 +6528,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             checked={newTaskIsCooking}
                             onChange={(e) => setNewTaskIsCooking(e.target.checked)}
                           />
-                          <span>Tâche de cuisine</span>
+                          <span>{t.planner.cookingTaskLabel}</span>
                         </label>
                         <label className={styles.taskOptionToggle}>
                           <input
@@ -6508,12 +6536,12 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             checked={newTaskIsRecurring}
                             onChange={(e) => setNewTaskIsRecurring(e.target.checked)}
                           />
-                          <span>Inscription récurrente</span>
+                          <span>{t.planner.recurringRegistration}</span>
                         </label>
                       </div>
 
                       <button
-                        className={styles.mobileCreateBtnFull} 
+                        className={styles.mobileCreateBtnFull}
                         onClick={() => {
                           if (mobileNewTaskSchedules.length > 0) {
                             setNewTaskSchedules(mobileNewTaskSchedules);
@@ -6524,7 +6552,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                         }}
                       >
                         <Icon name="plus" size={16} />
-                        Créer la tâche
+                        {t.planner.createTask}
                       </button>
                       {paramMessage && <p className={styles.mobileError}>{paramMessage}</p>}
                     </div>
@@ -6537,16 +6565,16 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       <div className={`${styles.mobileEvalBanner} ${getUserEvaluationCount(currentUser) >= tasks.length ? styles.mobileEvalBannerSuccess : ''}`}>
                         <Icon name={getUserEvaluationCount(currentUser) >= tasks.length ? "check" : "sliders"} size={14} />
                         <span>
-                          {getUserEvaluationCount(currentUser) >= tasks.length 
-                            ? "Vous avez évalué toutes les tâches ✓"
-                            : `Évaluations: ${getUserEvaluationCount(currentUser)}/${tasks.length} tâches`
+                          {getUserEvaluationCount(currentUser) >= tasks.length
+                            ? t.planner.allEvaluated
+                            : `${t.planner.evaluationsCount}: ${getUserEvaluationCount(currentUser)}/${tasks.length} ${t.common.tasks}`
                           }
                         </span>
                       </div>
                     )}
                     <h3 className={styles.mobileSectionTitle}>
                       <Icon name="clipboardList" size={16} />
-                      Toutes les tâches ({tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).length})
+                      {t.planner.allTasksList} ({tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).length})
                     </h3>
                     <div className={styles.mobileTaskList}>
                       {tasks.filter(t => t.title.toLowerCase().includes(taskSearch.toLowerCase())).map((task) => (
@@ -6562,7 +6590,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             />
                             <div className={styles.mobileInputRowEqual}>
                               <div className={styles.mobileInputGroupCompact}>
-                                <label>Durée</label>
+                                <label>{t.planner.durationLabel}</label>
                                 <div className={styles.mobileInputWithUnit}>
                                   <input
                                     type="number"
@@ -6575,7 +6603,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 </div>
                               </div>
                               <div className={styles.mobileInputGroupCompact}>
-                                <label>Pénibilité</label>
+                                <label>{t.planner.penibilityShort}</label>
                                 <div className={styles.mobileInputWithUnit}>
                                   <input
                                     type="number"
@@ -6590,11 +6618,11 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             </div>
                             {/* Schedule editing */}
                             <div className={styles.mobileScheduleSection}>
-                              <label className={styles.mobileScheduleLabel}>Créneaux</label>
+                              <label className={styles.mobileScheduleLabel}>{t.planner.slots}</label>
                               <div className={styles.mobileScheduleList}>
                                 {(task.schedules || [task.slot]).map((slot, idx) => (
                                   <div key={idx} className={styles.mobileScheduleChip}>
-                                    <span>{slot}</span>
+                                    <span>{translateSlot(slot)}</span>
                                     {(task.schedules?.length || 1) > 1 && (
                                       <button onClick={() => removeScheduleFromTask(task.id, slot)}>
                                         <Icon name="x" size={10} />
@@ -6609,7 +6637,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                   value={getScheduleDraft(task.id).day}
                                   onChange={(e) => updateScheduleDraft(task.id, { day: e.target.value })}
                                 >
-                                  {dayOptions.map(d => <option key={d} value={d}>{d}</option>)}
+                                  {dayOptions.map(d => <option key={d} value={d}>{translateDay(d)}</option>)}
                                 </select>
                                 <input
                                   type="time"
@@ -6628,7 +6656,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                             <div className={styles.mobileEditActions}>
                               <button className={styles.mobileSaveBtn} onClick={saveEditTask}>
                                 <Icon name="check" size={14} />
-                                Sauver
+                                {t.common.save2}
                               </button>
                               <button className={styles.mobileCancelBtn} onClick={cancelEditTask}>
                                 <Icon name="x" size={14} />
@@ -6651,7 +6679,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 });
                                 setShowEvaluationModal(task.id);
                               }}
-                              title={getMyEvaluation(task.id) ? "Modifier mon évaluation" : "Évaluer cette tâche"}
+                              title={getMyEvaluation(task.id) ? t.planner.editEvaluation : t.planner.evaluateTask}
                             >
                               <Icon name={getMyEvaluation(task.id) ? "check" : "sliders"} size={12} />
                             </button>
@@ -6675,18 +6703,18 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 <div className={styles.mobileTab}>
                   {/* View selector */}
                   <div className={styles.mobileCalendarViewSelector}>
-                    <button 
+                    <button
                       className={`${styles.mobileViewBtn} ${mobileCalendarView === 'month' ? styles.mobileViewBtnActive : ''}`}
                       onClick={() => setMobileCalendarView('month')}
-                    >Mois</button>
-                    <button 
+                    >{t.planner.month}</button>
+                    <button
                       className={`${styles.mobileViewBtn} ${mobileCalendarView === 'week' ? styles.mobileViewBtnActive : ''}`}
                       onClick={() => setMobileCalendarView('week')}
-                    >Semaine</button>
-                    <button 
+                    >{t.planner.week}</button>
+                    <button
                       className={`${styles.mobileViewBtn} ${mobileCalendarView === 'day' ? styles.mobileViewBtnActive : ''}`}
                       onClick={() => setMobileCalendarView('day')}
-                    >Jour</button>
+                    >{t.planner.day}</button>
                   </div>
 
                   <div className={styles.mobileCalendarHeader}>
@@ -6709,10 +6737,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     </button>
                     <span className={styles.mobileMonthLabel}>
                       {mobileCalendarView === 'day' && selectedCalendarDay 
-                        ? selectedCalendarDay.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })
+                        ? selectedCalendarDay.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })
                         : mobileCalendarView === 'week' && selectedCalendarDay
-                        ? `Sem. du ${getWeekStart(selectedCalendarDay).toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' })}`
-                        : calendarMonth.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' })
+                        ? `Sem. du ${getWeekStart(selectedCalendarDay).toLocaleDateString(locale, { day: 'numeric', month: 'short' })}`
+                        : calendarMonth.toLocaleDateString(locale, { month: 'long', year: 'numeric' })
                       }
                     </span>
                     <button onClick={() => {
@@ -6772,10 +6800,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   {mobileCalendarView === 'month' && selectedCalendarDay && (
                     <div className={styles.mobileSelectedDayEvents}>
                       <h4 className={styles.mobileSelectedDayTitle}>
-                        {selectedCalendarDay.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        {selectedCalendarDay.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
                       </h4>
                       {getEventsForDate(selectedCalendarDay).length === 0 ? (
-                        <p className={styles.mobileEmptyState}>Aucune indisponibilité ce jour</p>
+                        <p className={styles.mobileEmptyState}>{t.planner.noUnavailability}</p>
                       ) : (
                         <div className={styles.mobileSelectedDayList}>
                           {getEventsForDate(selectedCalendarDay).map((event, idx) => {
@@ -6793,7 +6821,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 <div className={styles.mobileDayEventInfo}>
                                   <span className={styles.mobileDayEventTitle}>{event.title}</span>
                                   <span className={styles.mobileDayEventTime}>
-                                    {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                                    {event.allDay ? t.planner.allDayEvent : `${new Date(event.start).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`}
                                   </span>
                                   {user && <span className={styles.mobileDayEventUser}>{user.name}</span>}
                                 </div>
@@ -6826,7 +6854,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               onClick={() => setSelectedCalendarDay(day)}
                             >
                               <div className={styles.mobileWeekDayHeader}>
-                                <span className={styles.mobileWeekDayName}>{day.toLocaleDateString('fr-FR', { weekday: 'short' })}</span>
+                                <span className={styles.mobileWeekDayName}>{day.toLocaleDateString(locale, { weekday: 'short' })}</span>
                                 <span className={styles.mobileWeekDayNum}>{day.getDate()}</span>
                                 {dayEvents.length > 0 && (
                                   <div className={styles.mobileWeekDayDots}>
@@ -6865,10 +6893,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   {mobileCalendarView === 'week' && selectedCalendarDay && (
                     <div className={styles.mobileSelectedDayEvents}>
                       <h4 className={styles.mobileSelectedDayTitle}>
-                        {selectedCalendarDay.toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}
+                        {selectedCalendarDay.toLocaleDateString(locale, { weekday: 'long', day: 'numeric', month: 'long' })}
                       </h4>
                       {getEventsForDate(selectedCalendarDay).length === 0 ? (
-                        <p className={styles.mobileEmptyState}>Aucune indisponibilité ce jour</p>
+                        <p className={styles.mobileEmptyState}>{t.planner.noUnavailability}</p>
                       ) : (
                         <div className={styles.mobileSelectedDayList}>
                           {getEventsForDate(selectedCalendarDay).map((event, idx) => {
@@ -6883,7 +6911,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                                 <div className={styles.mobileDayEventInfo}>
                                   <span className={styles.mobileDayEventTitle}>{event.title}</span>
                                   <span className={styles.mobileDayEventTime}>
-                                    {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                                    {event.allDay ? t.planner.allDayEvent : `${new Date(event.start).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`}
                                   </span>
                                   {user && <span className={styles.mobileDayEventUser}>{user.name}</span>}
                                 </div>
@@ -6899,7 +6927,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   {mobileCalendarView === 'day' && selectedCalendarDay && (
                     <div className={styles.mobileDayView}>
                       {getEventsForDate(selectedCalendarDay).length === 0 ? (
-                        <p className={styles.mobileEmptyState}>Aucun événement ce jour</p>
+                        <p className={styles.mobileEmptyState}>{t.planner.noEvents}</p>
                       ) : (
                         getEventsForDate(selectedCalendarDay).map((event, idx) => {
                           const member = calendarMembers.find(m => m.userId === event.userId);
@@ -6916,7 +6944,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                               <div className={styles.mobileDayEventInfo}>
                                 <span className={styles.mobileDayEventTitle}>{event.title}</span>
                                 <span className={styles.mobileDayEventTime}>
-                                  {event.allDay ? 'Toute la journée' : `${new Date(event.start).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })}`}
+                                  {event.allDay ? t.planner.allDayEvent : `${new Date(event.start).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })} - ${new Date(event.end).toLocaleTimeString(locale, { hour: '2-digit', minute: '2-digit' })}`}
                                 </span>
                                 {user && <span className={styles.mobileDayEventUser}>{user.name}</span>}
                               </div>
@@ -6947,7 +6975,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             {mobileDelegationModal && (
               <div className={styles.mobileDelegationOverlay}>
                 <div className={styles.mobileDelegationModal}>
-                  <h3 className={styles.mobileDelegationTitle}>Qui a fait cette tâche ?</h3>
+                  <h3 className={styles.mobileDelegationTitle}>{t.planner.whoDidTask}</h3>
                   <div className={styles.mobileDelegationOptions}>
                     {users.filter(u => u.id !== currentUser).map(user => (
                       <button
@@ -6990,14 +7018,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       <div className={styles.mobileDelegationAvatarNobody}>
                         <Icon name="x" size={16} />
                       </div>
-                      <span>Personne</span>
+                      <span>{t.planner.nobody}</span>
                     </button>
                   </div>
                   <button
                     className={styles.mobileDelegationCancel}
                     onClick={() => setMobileDelegationModal(null)}
                   >
-                    Annuler
+                    {t.common.cancel}
                   </button>
                 </div>
               </div>
@@ -7008,7 +7036,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               <div className={styles.eventModal} onClick={() => setDishModal(null)}>
                 <div className={styles.dishModalContent} onClick={(e) => e.stopPropagation()}>
                   <div className={styles.dishModalHeader}>
-                    <h4>Quel plat cuisinez-vous ?</h4>
+                    <h4>{t.planner.whatDish}</h4>
                   </div>
                   <div className={styles.dishModalBody}>
                     <input
@@ -7016,13 +7044,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       value={dishInput}
                       onChange={(e) => setDishInput(e.target.value)}
                       onKeyDown={(e) => { if (e.key === 'Enter') confirmDishAndClaim(); }}
-                      placeholder="Ex: Pâtes carbonara"
+                      placeholder={t.planner.dishPlaceholder}
                       className={styles.dishModalInput}
                       autoFocus
                     />
                     <div className={styles.dishModalActions}>
-                      <button className={styles.dishModalCancel} onClick={() => setDishModal(null)}>Annuler</button>
-                      <button className={styles.dishModalConfirm} onClick={confirmDishAndClaim}>Confirmer</button>
+                      <button className={styles.dishModalCancel} onClick={() => setDishModal(null)}>{t.common.cancel}</button>
+                      <button className={styles.dishModalConfirm} onClick={confirmDishAndClaim}>{t.common.confirm}</button>
                     </div>
                   </div>
                 </div>
@@ -7034,18 +7062,18 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               <div className={styles.mobileDelegationOverlay}>
                 <div className={styles.mobileEvaluationModal}>
                   <h3 className={styles.mobileDelegationTitle}>
-                    Mon évaluation
+                    {t.planner.myEvaluation}
                     <span className={styles.mobileEvalSubtitle}>
                       {tasks.find(t => t.id === showEvaluationModal)?.title}
                     </span>
                   </h3>
                   <p className={styles.mobileEvalExplain}>
-                    Indiquez <strong>votre ressenti</strong> sur la durée et la pénibilité de cette tâche. Ces données servent à l'auto-attribution intelligente.
+                    {t.planner.evalInstructions}
                   </p>
-                  
+
                   <div className={styles.mobileEvalInputs}>
                     <div className={styles.mobileEvalInputGroup}>
-                      <label>Durée estimée</label>
+                      <label>{t.planner.estimatedDuration}</label>
                       <div className={styles.mobileInputWithUnit}>
                         <input
                           type="number"
@@ -7058,7 +7086,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       </div>
                     </div>
                     <div className={styles.mobileEvalInputGroup}>
-                      <label>Pénibilité ressentie</label>
+                      <label>{t.planner.perceivedPenibility}</label>
                       <div className={styles.mobileInputWithUnit}>
                         <input
                           type="number"
@@ -7075,7 +7103,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   <div className={styles.mobileEvalInfo}>
                     <Icon name="info" size={14} />
                     <span>
-                      Points collectifs calculés sur la <strong>médiane</strong> de toutes les évaluations
+                      {t.planner.pointsMedianHelp}
                     </span>
                   </div>
 
@@ -7088,13 +7116,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       }}
                     >
                       <Icon name="check" size={16} />
-                      Enregistrer
+                      {t.planner.saveBtnLabel}
                     </button>
                     <button
                       className={styles.mobileDelegationCancel}
                       onClick={() => setShowEvaluationModal(null)}
                     >
-                      Annuler
+                      {t.common.cancel}
                     </button>
                   </div>
                 </div>
@@ -7108,14 +7136,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       {showSuggestionModal && (
         <div className={styles.modalOverlay} onClick={() => { setShowSuggestionModal(false); setSuggestionMessage(""); }}>
           <div className={styles.evaluationModal} onClick={e => e.stopPropagation()}>
-            <h3 className={styles.evaluationModalTitle}>Proposer une idée</h3>
+            <h3 className={styles.evaluationModalTitle}>{t.planner.suggestIdea}</h3>
             <p className={styles.evaluationModalSubtitle}>
-              Une idée pour améliorer Fam'Planner ? Partagez-la !
+              {t.planner.suggestIdeaDesc}
             </p>
             <textarea
               value={suggestionText}
               onChange={(e) => setSuggestionText(e.target.value)}
-              placeholder="Décrivez votre idée..."
+              placeholder={t.planner.describeIdea}
               rows={4}
               style={{
                 width: '100%',
@@ -7140,7 +7168,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 className={styles.autoAssignErrorCancel}
                 onClick={() => { setShowSuggestionModal(false); setSuggestionMessage(""); }}
               >
-                Annuler
+                {t.common.cancel}
               </button>
               <button
                 className={styles.autoAssignErrorBtn}
@@ -7162,7 +7190,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   }).catch(() => {});
                 }}
               >
-                Envoyer
+                {t.common.send}
               </button>
             </div>
           </div>
@@ -7175,18 +7203,18 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           <div className={styles.eventModalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
             <button className={styles.closeModal} onClick={() => { setShowEventForm(false); setEditingEvent(null); }}>×</button>
             <div className={styles.eventModalHeader} style={{ backgroundColor: 'var(--color-primary)' }}>
-              <h4>{editingEvent ? "Modifier l'événement" : "Nouvel événement"}</h4>
+              <h4>{editingEvent ? t.planner.editEvent : t.planner.newEvent}</h4>
             </div>
             <div className={styles.eventModalBody}>
               <form onSubmit={handleEventSubmit} className={styles.eventForm}>
-                <label className={styles.eventFormLabel}>Titre *</label>
+                <label className={styles.eventFormLabel}>{t.planner.titleRequired}</label>
                 <input
                   type="text"
                   className={styles.eventFormInput}
                   value={eventFormData.title}
                   onChange={(e) => setEventFormData({ ...eventFormData, title: e.target.value })}
                   required
-                  placeholder="Titre de l'événement"
+                  placeholder={t.planner.eventTitle}
                 />
 
                 <label className={styles.eventFormLabel}>Date *</label>
@@ -7204,13 +7232,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     checked={eventFormData.allDay}
                     onChange={(e) => setEventFormData({ ...eventFormData, allDay: e.target.checked })}
                   />
-                  Toute la journée
+                  {t.planner.allDayEvent}
                 </label>
 
                 {!eventFormData.allDay && (
                   <div className={styles.eventFormRow}>
                     <div className={styles.eventFormField}>
-                      <label className={styles.eventFormLabel}>Début</label>
+                      <label className={styles.eventFormLabel}>{t.planner.start}</label>
                       <input
                         type="time"
                         className={styles.eventFormInput}
@@ -7219,7 +7247,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       />
                     </div>
                     <div className={styles.eventFormField}>
-                      <label className={styles.eventFormLabel}>Fin</label>
+                      <label className={styles.eventFormLabel}>{t.planner.end}</label>
                       <input
                         type="time"
                         className={styles.eventFormInput}
@@ -7230,40 +7258,40 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   </div>
                 )}
 
-                <label className={styles.eventFormLabel}>Description</label>
+                <label className={styles.eventFormLabel}>{t.planner.descriptionOptional}</label>
                 <textarea
                   className={styles.eventFormTextarea}
                   value={eventFormData.description}
                   onChange={(e) => setEventFormData({ ...eventFormData, description: e.target.value })}
-                  placeholder="Description (optionnel)"
+                  placeholder={t.planner.descriptionOptional}
                   rows={3}
                 />
 
-                <label className={styles.eventFormLabel}>Lieu</label>
+                <label className={styles.eventFormLabel}>{t.planner.locationOptional}</label>
                 <input
                   type="text"
                   className={styles.eventFormInput}
                   value={eventFormData.location}
                   onChange={(e) => setEventFormData({ ...eventFormData, location: e.target.value })}
-                  placeholder="Lieu (optionnel)"
+                  placeholder={t.planner.locationOptional}
                 />
 
-                <label className={styles.eventFormLabel}>Récurrence</label>
+                <label className={styles.eventFormLabel}>{t.planner.recurrence}</label>
                 <select
                   className={styles.eventFormSelect}
                   value={eventFormData.recurrence}
                   onChange={(e) => setEventFormData({ ...eventFormData, recurrence: e.target.value })}
                 >
-                  <option value="none">Aucune</option>
-                  <option value="daily">Quotidienne</option>
-                  <option value="weekly">Hebdomadaire</option>
-                  <option value="monthly">Mensuelle</option>
-                  <option value="yearly">Annuelle</option>
+                  <option value="none">{t.planner.recurrenceNone}</option>
+                  <option value="daily">{t.planner.daily}</option>
+                  <option value="weekly">{t.planner.weeklyRecurrence}</option>
+                  <option value="monthly">{t.planner.monthlyRecurrence}</option>
+                  <option value="yearly">{t.planner.yearly}</option>
                 </select>
 
                 {eventFormData.recurrence !== "none" && (
                   <>
-                    <label className={styles.eventFormLabel}>Fin de récurrence (optionnel)</label>
+                    <label className={styles.eventFormLabel}>{t.planner.recurrenceEnd}</label>
                     <input
                       type="date"
                       className={styles.eventFormInput}
@@ -7275,15 +7303,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
                 <div className={styles.eventFormActions}>
                   <button type="button" className={styles.eventFormCancel} onClick={() => { setShowEventForm(false); setEditingEvent(null); }}>
-                    Annuler
+                    {t.common.cancel}
                   </button>
                   {editingEvent && (
                     <button type="button" className={styles.eventFormDelete} onClick={() => handleEventDelete()}>
-                      <Icon name="trash" size={14} /> Supprimer
+                      <Icon name="trash" size={14} /> {t.common.delete}
                     </button>
                   )}
                   <button type="submit" className={styles.eventFormSubmit}>
-                    <Icon name="check" size={14} /> {editingEvent ? "Modifier" : "Créer"}
+                    <Icon name="check" size={14} /> {editingEvent ? t.common.edit : t.common.create}
                   </button>
                 </div>
               </form>
@@ -7309,19 +7337,19 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           />
           <div>
             <h1 className={styles.brandTitle}>Fam'Planner</h1>
-            <p className={styles.brandSubtitle}>Organisation familiale</p>
+            <p className={styles.brandSubtitle}>{t.planner.familyOrganization}</p>
           </div>
         </div>
         <div className={styles.topActions}>
           <button
             className={styles.themeToggle}
             onClick={() => setShowSuggestionModal(true)}
-            title="Proposer une idée"
+            title={t.planner.suggestIdea}
           >
             <Icon name="lightbulb" size={18} />
-            <span className={styles.themeLabel}>Idée</span>
+            <span className={styles.themeLabel}>{t.planner.idea}</span>
           </button>
-          <Link href="/settings" className={styles.settingsLink} title="Paramètres">
+          <Link href="/settings" className={styles.settingsLink} title={t.common.settings}>
             <Icon name="gear" size={18} />
           </Link>
           {currentUserEntity && <span className={styles.userChip}>{currentUserEntity.name}</span>}
@@ -7348,19 +7376,18 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           <div className={styles.evaluationModal} onClick={(e) => e.stopPropagation()}>
             <h3 className={styles.evaluationModalTitle}>
               <Icon name="sliders" size={20} />
-              Mon évaluation personnelle
+              {t.planner.myPersonalEvaluation}
             </h3>
             <p className={styles.evaluationModalSubtitle}>
               {tasks.find(t => t.id === showEvaluationModal)?.title}
             </p>
             <p className={styles.evaluationModalExplain}>
-              Indiquez <strong>votre ressenti</strong> sur la durée et la pénibilité de cette tâche. 
-              Ces données servent à calculer les points (médiane) et à l'auto-attribution intelligente.
+              {t.planner.evalInstructionsDesktop}
             </p>
             
             <div className={styles.evaluationModalInputs}>
               <div className={styles.evaluationModalField}>
-                <label>Durée estimée (minutes)</label>
+                <label>{t.planner.estimatedDurationMinutes}</label>
                 <input
                   type="number"
                   value={pendingEvaluation.duration}
@@ -7370,7 +7397,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 />
               </div>
               <div className={styles.evaluationModalField}>
-                <label>Pénibilité ressentie (%)</label>
+                <label>{t.planner.perceivedPenibilityPercent}</label>
                 <input
                   type="number"
                   value={pendingEvaluation.penibility}
@@ -7384,8 +7411,8 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             <div className={styles.evaluationModalInfo}>
               <Icon name="info" size={14} />
               <span>
-                Les points collectifs sont calculés sur la <strong>médiane</strong> de toutes les évaluations.
-                L'auto-attribution utilise vos préférences relatives pour équilibrer les tâches.
+                {t.planner.pointsMedianDesktop}
+                {' '}{t.planner.autoAssignMedianHelp}
               </span>
             </div>
 
@@ -7398,13 +7425,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 }}
               >
                 <Icon name="check" size={16} />
-                Enregistrer
+                {t.planner.saveBtnLabel}
               </button>
               <button
                 className={styles.evaluationModalCancel}
                 onClick={() => setShowEvaluationModal(null)}
               >
-                Annuler
+                {t.common.cancel}
               </button>
             </div>
           </div>
@@ -7418,9 +7445,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             <div className={styles.autoAssignErrorIcon}>
               <Icon name="warning" size={32} />
             </div>
-            <h3 className={styles.autoAssignErrorTitle}>Évaluations incomplètes</h3>
+            <h3 className={styles.autoAssignErrorTitle}>{t.planner.incompleteEvals}</h3>
             <p className={styles.autoAssignErrorText}>
-              Tous les membres doivent évaluer toutes les tâches avant l'auto-attribution.
+              {t.planner.allMustEval}
             </p>
             {missingEvaluationUsers.length > 0 && (
               <div style={{ width: '100%', margin: '12px 0' }}>
@@ -7435,7 +7462,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               </div>
             )}
             <p className={styles.autoAssignErrorExplain}>
-              Chaque membre doit évaluer la durée et la pénibilité de toutes les tâches selon son propre ressenti.
+              {t.planner.eachMustEvalAll}
             </p>
             <div className={styles.autoAssignErrorActions}>
               <button
@@ -7446,7 +7473,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 }}
               >
                 <Icon name="sliders" size={16} />
-                Évaluer les tâches
+                {t.planner.evalTasks}
               </button>
               <button
                 className={styles.autoAssignErrorCancel}
@@ -7463,14 +7490,14 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       {showSuggestionModal && (
         <div className={styles.modalOverlay} onClick={() => { setShowSuggestionModal(false); setSuggestionMessage(""); }}>
           <div className={styles.evaluationModal} onClick={e => e.stopPropagation()}>
-            <h3 className={styles.evaluationModalTitle}>Proposer une idée</h3>
+            <h3 className={styles.evaluationModalTitle}>{t.planner.suggestIdea}</h3>
             <p className={styles.evaluationModalSubtitle}>
-              Une idée pour améliorer Fam'Planner ? Partagez-la !
+              {t.planner.suggestIdeaDesc}
             </p>
             <textarea
               value={suggestionText}
               onChange={(e) => setSuggestionText(e.target.value)}
-              placeholder="Décrivez votre idée..."
+              placeholder={t.planner.describeIdea}
               rows={4}
               style={{
                 width: '100%',
@@ -7495,7 +7522,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 className={styles.autoAssignErrorCancel}
                 onClick={() => { setShowSuggestionModal(false); setSuggestionMessage(""); }}
               >
-                Annuler
+                {t.common.cancel}
               </button>
               <button
                 className={styles.autoAssignErrorBtn}
@@ -7517,7 +7544,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   }).catch(() => {});
                 }}
               >
-                Envoyer
+                {t.common.send}
               </button>
             </div>
           </div>
@@ -7534,7 +7561,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               <button
                 className={`${styles.toastDetailsToggle} ${toastDetailsOpen ? styles.toastDetailsToggleOpen : ''}`}
                 onClick={(e) => { e.stopPropagation(); setToastDetailsOpen(v => !v); }}
-                aria-label="Voir les détails"
+                aria-label={t.planner.viewDetails}
               >
                 <Icon name="chevronDown" size={14} />
               </button>
@@ -7562,18 +7589,18 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
           <div className={styles.eventModalContent} onClick={(e) => e.stopPropagation()} style={{ maxWidth: '500px' }}>
             <button className={styles.closeModal} onClick={() => { setShowEventForm(false); setEditingEvent(null); }}>×</button>
             <div className={styles.eventModalHeader} style={{ backgroundColor: 'var(--color-primary)' }}>
-              <h4>{editingEvent ? "Modifier l'événement" : "Nouvel événement"}</h4>
+              <h4>{editingEvent ? t.planner.editEvent : t.planner.newEvent}</h4>
             </div>
             <div className={styles.eventModalBody}>
               <form onSubmit={handleEventSubmit} className={styles.eventForm}>
-                <label className={styles.eventFormLabel}>Titre *</label>
+                <label className={styles.eventFormLabel}>{t.planner.titleRequired}</label>
                 <input
                   type="text"
                   className={styles.eventFormInput}
                   value={eventFormData.title}
                   onChange={(e) => setEventFormData({ ...eventFormData, title: e.target.value })}
                   required
-                  placeholder="Titre de l'événement"
+                  placeholder={t.planner.eventTitle}
                 />
 
                 <label className={styles.eventFormLabel}>Date *</label>
@@ -7591,13 +7618,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                     checked={eventFormData.allDay}
                     onChange={(e) => setEventFormData({ ...eventFormData, allDay: e.target.checked })}
                   />
-                  Toute la journée
+                  {t.planner.allDayEvent}
                 </label>
 
                 {!eventFormData.allDay && (
                   <div className={styles.eventFormRow}>
                     <div className={styles.eventFormField}>
-                      <label className={styles.eventFormLabel}>Début</label>
+                      <label className={styles.eventFormLabel}>{t.planner.start}</label>
                       <input
                         type="time"
                         className={styles.eventFormInput}
@@ -7606,7 +7633,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                       />
                     </div>
                     <div className={styles.eventFormField}>
-                      <label className={styles.eventFormLabel}>Fin</label>
+                      <label className={styles.eventFormLabel}>{t.planner.end}</label>
                       <input
                         type="time"
                         className={styles.eventFormInput}
@@ -7617,40 +7644,40 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                   </div>
                 )}
 
-                <label className={styles.eventFormLabel}>Description</label>
+                <label className={styles.eventFormLabel}>{t.planner.descriptionOptional}</label>
                 <textarea
                   className={styles.eventFormTextarea}
                   value={eventFormData.description}
                   onChange={(e) => setEventFormData({ ...eventFormData, description: e.target.value })}
-                  placeholder="Description (optionnel)"
+                  placeholder={t.planner.descriptionOptional}
                   rows={3}
                 />
 
-                <label className={styles.eventFormLabel}>Lieu</label>
+                <label className={styles.eventFormLabel}>{t.planner.locationOptional}</label>
                 <input
                   type="text"
                   className={styles.eventFormInput}
                   value={eventFormData.location}
                   onChange={(e) => setEventFormData({ ...eventFormData, location: e.target.value })}
-                  placeholder="Lieu (optionnel)"
+                  placeholder={t.planner.locationOptional}
                 />
 
-                <label className={styles.eventFormLabel}>Récurrence</label>
+                <label className={styles.eventFormLabel}>{t.planner.recurrence}</label>
                 <select
                   className={styles.eventFormSelect}
                   value={eventFormData.recurrence}
                   onChange={(e) => setEventFormData({ ...eventFormData, recurrence: e.target.value })}
                 >
-                  <option value="none">Aucune</option>
-                  <option value="daily">Quotidienne</option>
-                  <option value="weekly">Hebdomadaire</option>
-                  <option value="monthly">Mensuelle</option>
-                  <option value="yearly">Annuelle</option>
+                  <option value="none">{t.planner.recurrenceNone}</option>
+                  <option value="daily">{t.planner.daily}</option>
+                  <option value="weekly">{t.planner.weeklyRecurrence}</option>
+                  <option value="monthly">{t.planner.monthlyRecurrence}</option>
+                  <option value="yearly">{t.planner.yearly}</option>
                 </select>
 
                 {eventFormData.recurrence !== "none" && (
                   <>
-                    <label className={styles.eventFormLabel}>Fin de récurrence (optionnel)</label>
+                    <label className={styles.eventFormLabel}>{t.planner.recurrenceEnd}</label>
                     <input
                       type="date"
                       className={styles.eventFormInput}
@@ -7662,15 +7689,15 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
 
                 <div className={styles.eventFormActions}>
                   <button type="button" className={styles.eventFormCancel} onClick={() => { setShowEventForm(false); setEditingEvent(null); }}>
-                    Annuler
+                    {t.common.cancel}
                   </button>
                   {editingEvent && (
                     <button type="button" className={styles.eventFormDelete} onClick={() => handleEventDelete()}>
-                      <Icon name="trash" size={14} /> Supprimer
+                      <Icon name="trash" size={14} /> {t.common.delete}
                     </button>
                   )}
                   <button type="submit" className={styles.eventFormSubmit}>
-                    <Icon name="check" size={14} /> {editingEvent ? "Modifier" : "Créer"}
+                    <Icon name="check" size={14} /> {editingEvent ? t.common.edit : t.common.create}
                   </button>
                 </div>
               </form>
@@ -7684,7 +7711,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         <div className={styles.eventModal} onClick={() => setDishModal(null)}>
           <div className={styles.dishModalContent} onClick={(e) => e.stopPropagation()}>
             <div className={styles.dishModalHeader}>
-              <h4>Quel plat cuisinez-vous ?</h4>
+              <h4>{t.planner.whatDish}</h4>
             </div>
             <div className={styles.dishModalBody}>
               <input
@@ -7692,13 +7719,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 value={dishInput}
                 onChange={(e) => setDishInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') confirmDishAndClaim(); }}
-                placeholder="Ex: Pâtes carbonara"
+                placeholder={t.planner.dishPlaceholder}
                 className={styles.dishModalInput}
                 autoFocus
               />
               <div className={styles.dishModalActions}>
-                <button className={styles.dishModalCancel} onClick={() => setDishModal(null)}>Annuler</button>
-                <button className={styles.dishModalConfirm} onClick={confirmDishAndClaim}>Confirmer</button>
+                <button className={styles.dishModalCancel} onClick={() => setDishModal(null)}>{t.common.cancel}</button>
+                <button className={styles.dishModalConfirm} onClick={confirmDishAndClaim}>{t.common.confirm}</button>
               </div>
             </div>
           </div>

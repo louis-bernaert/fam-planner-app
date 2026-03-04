@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Aucun utilisateur trouvé avec cet email. Le membre doit d'abord créer un compte." },
+        { error: "No user found with this email. The member must create an account first." },
         { status: 404 }
       );
     }

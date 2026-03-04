@@ -4,6 +4,7 @@ import { useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import styles from "./page.module.css";
+import { useTranslation } from "../components/LanguageProvider";
 
 function ResetPasswordForm() {
   const searchParams = useSearchParams();
@@ -16,15 +17,16 @@ function ResetPasswordForm() {
   const [error, setError] = useState("");
   const [success, setSuccess] = useState(false);
   const [loading, setLoading] = useState(false);
+  const { t } = useTranslation();
 
   async function handleSubmit() {
     setError("");
     if (!password || password.length < 6) {
-      setError("Le mot de passe doit contenir au moins 6 caractères");
+      setError(t.resetPassword.passwordMinLength);
       return;
     }
     if (password !== confirmPassword) {
-      setError("Les mots de passe ne correspondent pas");
+      setError(t.resetPassword.passwordMismatch);
       return;
     }
     setLoading(true);
@@ -36,12 +38,12 @@ function ResetPasswordForm() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setError(data?.error || "Erreur lors de la réinitialisation");
+        setError(data?.error || t.resetPassword.resetError);
       } else {
         setSuccess(true);
       }
     } catch {
-      setError("Erreur réseau");
+      setError(t.resetPassword.networkError);
     } finally {
       setLoading(false);
     }
@@ -51,12 +53,12 @@ function ResetPasswordForm() {
     return (
       <main className={styles.shell}>
         <div className={styles.card}>
-          <h2 className={styles.title}>Lien invalide</h2>
+          <h2 className={styles.title}>{t.resetPassword.invalidLink}</h2>
           <p className={styles.description}>
-            Ce lien de réinitialisation est invalide ou incomplet.
+            {t.resetPassword.invalidLinkDesc}
           </p>
           <Link href="/planner?auth=login" className={styles.link}>
-            Retour à la connexion
+            {t.resetPassword.backToLogin}
           </Link>
         </div>
       </main>
@@ -72,12 +74,12 @@ function ResetPasswordForm() {
               <path d="M256 512A256 256 0 1 0 256 0a256 256 0 1 0 0 512zM369 209L241 337c-9.4 9.4-24.6 9.4-33.9 0l-64-64c-9.4-9.4-9.4-24.6 0-33.9s24.6-9.4 33.9 0l47 47L335 175c9.4-9.4 24.6-9.4 33.9 0s9.4 24.6 0 33.9z" />
             </svg>
           </div>
-          <h2 className={styles.title}>Mot de passe modifié</h2>
+          <h2 className={styles.title}>{t.resetPassword.passwordChanged}</h2>
           <p className={styles.description}>
-            Votre mot de passe a été réinitialisé avec succès.
+            {t.resetPassword.passwordChangedDesc}
           </p>
           <Link href="/planner?auth=login" className={styles.link}>
-            Se connecter
+            {t.resetPassword.loginBtn}
           </Link>
         </div>
       </main>
@@ -87,19 +89,19 @@ function ResetPasswordForm() {
   return (
     <main className={styles.shell}>
       <div className={styles.card}>
-        <h2 className={styles.title}>Nouveau mot de passe</h2>
+        <h2 className={styles.title}>{t.resetPassword.newPassword}</h2>
         <p className={styles.description}>
-          Choisissez un nouveau mot de passe pour votre compte.
+          {t.resetPassword.chooseNewPassword}
         </p>
         <div className={styles.form}>
           <div className={styles.inputGroup}>
-            <label className={styles.label}>Nouveau mot de passe</label>
+            <label className={styles.label}>{t.resetPassword.newPasswordLabel}</label>
             <div className={styles.passwordField}>
               <input
                 type={showPassword ? "text" : "password"}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="Min. 6 caractères"
+                placeholder={t.resetPassword.minChars}
                 className={styles.input}
               />
               <button
@@ -121,13 +123,13 @@ function ResetPasswordForm() {
             </div>
           </div>
           <div className={styles.inputGroup}>
-            <label className={styles.label}>Confirmer le mot de passe</label>
+            <label className={styles.label}>{t.resetPassword.confirmPassword}</label>
             <div className={styles.passwordField}>
               <input
                 type={showPassword ? "text" : "password"}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
-                placeholder="Confirmez votre mot de passe"
+                placeholder={t.resetPassword.confirmPlaceholder}
                 className={styles.input}
               />
             </div>
@@ -137,7 +139,7 @@ function ResetPasswordForm() {
             onClick={handleSubmit}
             disabled={loading}
           >
-            {loading ? "Réinitialisation..." : "Réinitialiser le mot de passe"}
+            {loading ? t.resetPassword.resetting : t.resetPassword.resetBtn}
           </button>
           {error && <p className={styles.error}>{error}</p>}
         </div>
@@ -147,12 +149,13 @@ function ResetPasswordForm() {
 }
 
 export default function ResetPasswordPage() {
+  const { t } = useTranslation();
   return (
     <Suspense
       fallback={
         <main className={styles.shell}>
           <div className={styles.card}>
-            <p>Chargement...</p>
+            <p>{t.common.loading}</p>
           </div>
         </main>
       }

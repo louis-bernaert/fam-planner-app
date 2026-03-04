@@ -7,7 +7,7 @@ export async function POST(request: Request) {
   try {
     const { email } = await request.json();
     if (!email) {
-      return NextResponse.json({ error: "Email requis" }, { status: 400 });
+      return NextResponse.json({ error: "Email required" }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({
@@ -74,6 +74,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("/api/auth/forgot-password error", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

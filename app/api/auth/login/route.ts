@@ -8,7 +8,7 @@ export async function POST(request: Request) {
     const { email, password } = body ?? {};
 
     if (!email || !password) {
-      return NextResponse.json({ error: "Email et mot de passe requis" }, { status: 400 });
+      return NextResponse.json({ error: "Email and password required" }, { status: 400 });
     }
 
     const user = await prisma.user.findUnique({
@@ -16,20 +16,20 @@ export async function POST(request: Request) {
       include: { memberships: true },
     });
     if (!user) {
-      return NextResponse.json({ error: "Compte introuvable" }, { status: 404 });
+      return NextResponse.json({ error: "Account not found" }, { status: 404 });
     }
 
     // Google-only accounts cannot login with password
     if (!user.passwordHash) {
       return NextResponse.json(
-        { error: "Ce compte utilise Google. Connectez-vous avec Google." },
+        { error: "This account uses Google. Please log in with Google." },
         { status: 401 }
       );
     }
 
     const valid = await bcrypt.compare(password, user.passwordHash);
     if (!valid) {
-      return NextResponse.json({ error: "Mot de passe invalide" }, { status: 401 });
+      return NextResponse.json({ error: "Invalid password" }, { status: 401 });
     }
 
     const cleanUser = {
@@ -42,6 +42,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ user: cleanUser });
   } catch (error) {
     console.error("/api/auth/login error", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }

@@ -4,15 +4,17 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import styles from "../settings.module.css";
 import Icon from "../../components/Icon";
+import { useTranslation } from "../../components/LanguageProvider";
 
 function makeFullName(first?: string, last?: string, fallback?: string) {
   if (first && last) return `${first} ${last}`;
   if (first) return first;
   if (last) return last;
-  return fallback ?? "Utilisateur";
+  return fallback ?? "User";
 }
 
 export default function ProfileSettingsPage() {
+  const { t } = useTranslation();
   const [currentUser, setCurrentUser] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
@@ -81,13 +83,13 @@ export default function ProfileSettingsPage() {
         }
         
         setFormData((prev) => ({ ...prev, password: "" }));
-        setMessage("Profil mis à jour avec succès !");
+        setMessage(t.settings.profileUpdated);
       } else {
-        setMessage("Erreur lors de la mise à jour");
+        setMessage(t.settings.profileUpdateError);
       }
     } catch (err) {
       console.error("Failed to update user", err);
-      setMessage("Erreur lors de la mise à jour");
+      setMessage(t.settings.profileUpdateError);
     } finally {
       setIsSaving(false);
     }
@@ -100,10 +102,10 @@ export default function ProfileSettingsPage() {
           <Link href="/settings" className={styles.backButtonArrow}>
             <Icon name="arrowLeft" size={20} />
           </Link>
-          <h1 className={styles.pageTitle}>Réglages profil</h1>
+          <h1 className={styles.pageTitle}>{t.settings.profileSettings}</h1>
         </div>
         <div className={styles.section}>
-          <p>Chargement...</p>
+          <p>{t.common.loading}</p>
         </div>
       </div>
     );
@@ -116,12 +118,12 @@ export default function ProfileSettingsPage() {
           <Link href="/settings" className={styles.backButtonArrow}>
             <Icon name="arrowLeft" size={20} />
           </Link>
-          <h1 className={styles.pageTitle}>Réglages profil</h1>
+          <h1 className={styles.pageTitle}>{t.settings.profileSettings}</h1>
         </div>
         <div className={styles.section}>
-          <p>Veuillez vous connecter pour accéder à vos paramètres.</p>
+          <p>{t.settings.loginToAccess}</p>
           <Link href="/planner?auth=login" style={{ color: 'var(--color-primary)', marginTop: '1rem', display: 'inline-block' }}>
-            Se connecter
+            {t.planner.loginBtn}
           </Link>
         </div>
       </div>
@@ -134,39 +136,39 @@ export default function ProfileSettingsPage() {
         <Link href="/settings" className={styles.backButtonArrow}>
           <Icon name="arrowLeft" size={20} />
         </Link>
-        <h1 className={styles.pageTitle}>Réglages profil</h1>
+        <h1 className={styles.pageTitle}>{t.settings.profileSettings}</h1>
       </div>
 
       <div className={styles.section}>
         <h3 className={styles.sectionTitle}>
-          Bonjour, {makeFullName(currentUser.firstName, currentUser.lastName, currentUser.name)}
+          {t.settings.hello}, {makeFullName(currentUser.firstName, currentUser.lastName, currentUser.name)}
         </h3>
         <p className={styles.mutedSmall} style={{ marginBottom: 'var(--space-4)' }}>
-          Modifiez vos informations personnelles ci-dessous.
+          {t.settings.editInfo}
         </p>
         
         <div className={styles.formGridSmall}>
-          <label className={styles.label}>Prénom</label>
+          <label className={styles.label}>{t.settings.firstName}</label>
           <input
             className={styles.input}
             value={formData.firstName}
             onChange={(e) =>
               setFormData((prev) => ({ ...prev, firstName: e.target.value }))
             }
-            placeholder={currentUser.firstName || "Prénom"}
+            placeholder={currentUser.firstName || t.settings.firstName}
           />
           
-          <label className={styles.label}>Nom</label>
+          <label className={styles.label}>{t.settings.lastName}</label>
           <input
             className={styles.input}
             value={formData.lastName}
             onChange={(e) =>
               setFormData((prev) => ({ ...prev, lastName: e.target.value }))
             }
-            placeholder={currentUser.lastName || "Nom"}
+            placeholder={currentUser.lastName || t.settings.lastName}
           />
           
-          <label className={styles.label}>Email</label>
+          <label className={styles.label}>{t.planner.email}</label>
           <input
             className={styles.input}
             type="email"
@@ -174,10 +176,10 @@ export default function ProfileSettingsPage() {
             onChange={(e) =>
               setFormData((prev) => ({ ...prev, email: e.target.value }))
             }
-            placeholder="Email"
+            placeholder={t.planner.email}
           />
           
-          <label className={styles.label}>Nouveau mot de passe</label>
+          <label className={styles.label}>{t.settings.newPassword}</label>
           <input
             className={styles.input}
             type="password"
@@ -185,7 +187,7 @@ export default function ProfileSettingsPage() {
             onChange={(e) =>
               setFormData((prev) => ({ ...prev, password: e.target.value }))
             }
-            placeholder="Laisser vide pour ne pas changer"
+            placeholder={t.settings.leaveEmpty}
           />
         </div>
 
@@ -196,10 +198,10 @@ export default function ProfileSettingsPage() {
             className={styles.smallButton}
             style={{ padding: 'var(--space-2) var(--space-4)' }}
           >
-            {isSaving ? "Enregistrement..." : "Sauvegarder"}
+            {isSaving ? t.common.saving : t.common.save2}
           </button>
           {message && (
-            <span className={styles.mutedSmall} style={{ color: message.includes('succès') ? 'var(--color-success)' : 'var(--color-error)' }}>
+            <span className={styles.mutedSmall} style={{ color: message === t.settings.profileUpdated ? 'var(--color-success)' : 'var(--color-error)' }}>
               {message}
             </span>
           )}

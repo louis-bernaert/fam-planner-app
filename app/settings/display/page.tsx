@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import styles from "../settings.module.css";
 import Icon from "../../components/Icon";
+import { useTranslation } from "../../components/LanguageProvider";
 
 type ThemeMode = "light" | "dark" | "system";
 type AccentColor = "blue" | "purple" | "green" | "orange" | "red" | "pink" | "teal";
@@ -22,6 +23,7 @@ export default function DisplaySettingsPage() {
   const [themeMode, setThemeMode] = useState<ThemeMode>("system");
   const [accentColor, setAccentColor] = useState<AccentColor>("blue");
   const [saved, setSaved] = useState(false);
+  const { t } = useTranslation();
 
   // Charger les préférences au montage
   useEffect(() => {
@@ -74,15 +76,15 @@ export default function DisplaySettingsPage() {
         <Link href="/settings" className={styles.backButtonArrow}>
           <Icon name="arrowLeft" size={20} />
         </Link>
-        <h1 className={styles.pageTitle}>Réglages affichage</h1>
+        <h1 className={styles.pageTitle}>{t.settings.displaySettings}</h1>
       </div>
 
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>
           <Icon name="palette" size={18} />
-          Couleur d'accent
+          {t.settings.accentColor}
         </h2>
-        <p className={styles.sectionDesc}>Choisissez la couleur principale des boutons et éléments interactifs</p>
+        <p className={styles.sectionDesc}>{t.settings.accentColorDesc}</p>
 
         <div className={styles.colorGrid}>
           {ACCENT_COLORS.map((color) => (
@@ -91,13 +93,13 @@ export default function DisplaySettingsPage() {
               key={color.id}
               className={`${styles.colorOption} ${accentColor === color.id ? styles.active : ""}`}
               onClick={() => setAccentColor(color.id)}
-              title={color.label}
+              title={t.settings.colors[color.id]}
             >
               <span
                 className={styles.colorSwatch}
                 style={{ backgroundColor: color.light }}
               ></span>
-              <span className={styles.colorLabel}>{color.label}</span>
+              <span className={styles.colorLabel}>{t.settings.colors[color.id]}</span>
               {accentColor === color.id && (
                 <Icon name="check" size={14} className={styles.checkIcon} />
               )}
@@ -109,9 +111,9 @@ export default function DisplaySettingsPage() {
       <div className={styles.section}>
         <h2 className={styles.sectionTitle}>
           <Icon name="sun" size={18} />
-          Mode de luminosité
+          {t.settings.brightness}
         </h2>
-        <p className={styles.sectionDesc}>Choisissez le thème par défaut de l'interface</p>
+        <p className={styles.sectionDesc}>{t.settings.brightnessDesc}</p>
 
         <div className={styles.themeOptions}>
           <button
@@ -127,7 +129,7 @@ export default function DisplaySettingsPage() {
               </div>
             </div>
             <Icon name="sun" size={20} className={styles.themeIconMobile} />
-            <span className={styles.themeLabel}>Clair</span>
+            <span className={styles.themeLabel}>{t.settings.light}</span>
           </button>
 
           <button
@@ -143,7 +145,7 @@ export default function DisplaySettingsPage() {
               </div>
             </div>
             <Icon name="moon" size={20} className={styles.themeIconMobile} />
-            <span className={styles.themeLabel}>Sombre</span>
+            <span className={styles.themeLabel}>{t.settings.dark}</span>
           </button>
 
           <button
@@ -159,7 +161,7 @@ export default function DisplaySettingsPage() {
               </div>
             </div>
             <Icon name="circleHalfStroke" size={20} className={styles.themeIconMobile} />
-            <span className={styles.themeLabel}>Système</span>
+            <span className={styles.themeLabel}>{t.settings.system}</span>
           </button>
         </div>
       </div>
@@ -167,7 +169,7 @@ export default function DisplaySettingsPage() {
       <div className={styles.actions}>
         <button type="button" className={styles.primaryBtn} onClick={handleSave}>
           <Icon name="check" size={16} />
-          {saved ? "Enregistré !" : "Enregistrer les préférences"}
+          {saved ? t.common.saved : t.common.save}
         </button>
       </div>
     </div>

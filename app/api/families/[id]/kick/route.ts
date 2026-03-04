@@ -24,7 +24,7 @@ export async function POST(
 
     if (!requesterMembership || requesterMembership.role !== "admin") {
       return NextResponse.json(
-        { error: "Seul un admin peut exclure un membre" },
+        { error: "Only an admin can remove a member" },
         { status: 403 }
       );
     }
@@ -36,14 +36,14 @@ export async function POST(
 
     if (!targetMembership) {
       return NextResponse.json(
-        { error: "Ce membre ne fait pas partie de cette famille" },
+        { error: "This member is not part of this family" },
         { status: 404 }
       );
     }
 
     if (targetMembership.role !== "member") {
       return NextResponse.json(
-        { error: "Impossible d'exclure un admin" },
+        { error: "Cannot remove an admin" },
         { status: 403 }
       );
     }
@@ -80,7 +80,7 @@ export async function POST(
   } catch (error) {
     console.error("POST /api/families/[id]/kick", error);
     return NextResponse.json(
-      { error: "Erreur lors de l'exclusion du membre" },
+      { error: "Error removing member" },
       { status: 500 }
     );
   }

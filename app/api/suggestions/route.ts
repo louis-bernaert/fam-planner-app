@@ -7,7 +7,7 @@ export async function POST(req: NextRequest) {
 
     if (!userId || !familyId || !content?.trim()) {
       return NextResponse.json(
-        { error: "userId, familyId et content requis" },
+        { error: "userId, familyId and content required" },
         { status: 400 }
       );
     }

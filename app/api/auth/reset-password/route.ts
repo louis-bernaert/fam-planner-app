@@ -7,12 +7,12 @@ export async function POST(request: Request) {
   try {
     const { token, email, password } = await request.json();
     if (!token || !email || !password) {
-      return NextResponse.json({ error: "Champs manquants" }, { status: 400 });
+      return NextResponse.json({ error: "Missing fields" }, { status: 400 });
     }
 
     if (password.length < 6) {
       return NextResponse.json(
-        { error: "Le mot de passe doit contenir au moins 6 caractères" },
+        { error: "Password must be at least 6 characters" },
         { status: 400 }
       );
     }
@@ -29,7 +29,7 @@ export async function POST(request: Request) {
 
     if (!user) {
       return NextResponse.json(
-        { error: "Lien invalide ou expiré" },
+        { error: "Invalid or expired link" },
         { status: 400 }
       );
     }
@@ -48,6 +48,6 @@ export async function POST(request: Request) {
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("/api/auth/reset-password error", error);
-    return NextResponse.json({ error: "Erreur serveur" }, { status: 500 });
+    return NextResponse.json({ error: "Server error" }, { status: 500 });
   }
 }
