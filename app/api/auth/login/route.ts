@@ -38,6 +38,7 @@ export async function POST(request: Request) {
       email: user.email,
       familyIds: user.memberships.map((m) => m.familyId),
       points: user.points,
+      preferences: user.preferences ?? {},
     };
     return NextResponse.json({ user: cleanUser });
   } catch (error) {

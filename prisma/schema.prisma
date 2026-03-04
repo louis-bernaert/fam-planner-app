@@ -20,6 +20,7 @@ model User {
   resetToken       String?
   resetTokenExpiry DateTime?
   points           Int               @default(0)
+  preferences      Json?
   memberships     Membership[]
   unavailables    Unavailability[]
   assignments     Assignment[]

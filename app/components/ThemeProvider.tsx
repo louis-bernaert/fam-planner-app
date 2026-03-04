@@ -32,32 +32,42 @@ function adjustBrightness(hex: string, percent: number): string {
 
 export function ThemeProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
-    // Appliquer le thème
-    const storedTheme = localStorage.getItem("theme");
-    if (storedTheme && storedTheme !== "system") {
-      document.documentElement.setAttribute("data-theme", storedTheme);
-    }
+    function applyThemeFromLocalStorage() {
+      // Appliquer le thème
+      const storedTheme = localStorage.getItem("theme");
+      if (storedTheme && storedTheme !== "system") {
+        document.documentElement.setAttribute("data-theme", storedTheme);
+      } else {
+        document.documentElement.removeAttribute("data-theme");
+      }
 
-    // Appliquer la couleur d'accent
-    const storedAccent = localStorage.getItem("accentColor") as AccentColor | null;
-    if (storedAccent) {
-      const color = ACCENT_COLORS.find((c) => c.id === storedAccent);
-      if (color) {
-        const isDark =
-          document.documentElement.getAttribute("data-theme") === "dark" ||
-          (!storedTheme || storedTheme === "system") && window.matchMedia("(prefers-color-scheme: dark)").matches;
-        
-        const primaryColor = isDark ? color.dark : color.light;
-        const hoverColor = isDark ? color.light : adjustBrightness(color.light, -15);
-        const subtleColor = isDark
-          ? `rgba(${hexToRgb(color.light)}, 0.15)`
-          : adjustBrightness(color.light, 95);
+      // Appliquer la couleur d'accent
+      const storedAccent = localStorage.getItem("accentColor") as AccentColor | null;
+      if (storedAccent) {
+        const color = ACCENT_COLORS.find((c) => c.id === storedAccent);
+        if (color) {
+          const isDark =
+            document.documentElement.getAttribute("data-theme") === "dark" ||
+            (!storedTheme || storedTheme === "system") && window.matchMedia("(prefers-color-scheme: dark)").matches;
 
-        document.documentElement.style.setProperty("--color-primary", primaryColor);
-        document.documentElement.style.setProperty("--color-primary-hover", hoverColor);
-        document.documentElement.style.setProperty("--color-primary-subtle", subtleColor);
+          const primaryColor = isDark ? color.dark : color.light;
+          const hoverColor = isDark ? color.light : adjustBrightness(color.light, -15);
+          const subtleColor = isDark
+            ? `rgba(${hexToRgb(color.light)}, 0.15)`
+            : adjustBrightness(color.light, 95);
+
+          document.documentElement.style.setProperty("--color-primary", primaryColor);
+          document.documentElement.style.setProperty("--color-primary-hover", hoverColor);
+          document.documentElement.style.setProperty("--color-primary-subtle", subtleColor);
+        }
       }
     }
+
+    applyThemeFromLocalStorage();
+
+    // Listen for preference changes from login flow (same tab)
+    const onPrefsUpdated = () => applyThemeFromLocalStorage();
+    window.addEventListener("preferences-updated", onPrefsUpdated);
 
     // Écouter les changements de préférence système
     const mediaQuery = window.matchMedia("(prefers-color-scheme: dark)");
@@ -83,7 +93,10 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     };
 
     mediaQuery.addEventListener("change", handleChange);
-    return () => mediaQuery.removeEventListener("change", handleChange);
+    return () => {
+      mediaQuery.removeEventListener("change", handleChange);
+      window.removeEventListener("preferences-updated", onPrefsUpdated);
+    };
   }, []);
 
   return <>{children}</>;

@@ -33,6 +33,7 @@ export async function POST(request: Request) {
       email: user.email,
       familyIds: [],
       points: user.points,
+      preferences: {},
     };
 
     return NextResponse.json({ user: cleanUser });

@@ -5,6 +5,7 @@ import Link from "next/link";
 import styles from "../settings.module.css";
 import Icon from "../../components/Icon";
 import { useTranslation } from "../../components/LanguageProvider";
+import { savePreferencesToDB } from "../../lib/userPreferences";
 
 type ThemeMode = "light" | "dark" | "system";
 type AccentColor = "blue" | "purple" | "green" | "orange" | "red" | "pink" | "teal";
@@ -66,6 +67,16 @@ export default function DisplaySettingsPage() {
   const handleSave = () => {
     localStorage.setItem("theme", themeMode);
     localStorage.setItem("accentColor", accentColor);
+
+    // Persist to DB if logged in
+    const raw = localStorage.getItem("sessionUser");
+    if (raw) {
+      try {
+        const user = JSON.parse(raw);
+        if (user.id) savePreferencesToDB(user.id, { theme: themeMode, accentColor });
+      } catch { /* ignore */ }
+    }
+
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

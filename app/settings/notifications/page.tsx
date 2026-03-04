@@ -5,6 +5,7 @@ import Link from "next/link";
 import styles from "../settings.module.css";
 import Icon from "../../components/Icon";
 import { useTranslation } from "../../components/LanguageProvider";
+import { savePreferencesToDB } from "../../lib/userPreferences";
 
 export default function NotificationsSettingsPage() {
   const { t } = useTranslation();
@@ -22,6 +23,13 @@ export default function NotificationsSettingsPage() {
   const handleSave = () => {
     localStorage.setItem("notif_freeTasks", String(freeTasksNotif));
     localStorage.setItem("notif_evalTasks", String(evalNotif));
+    const raw = localStorage.getItem("sessionUser");
+    if (raw) {
+      try {
+        const user = JSON.parse(raw);
+        if (user.id) savePreferencesToDB(user.id, { notif_freeTasks: freeTasksNotif, notif_evalTasks: evalNotif });
+      } catch { /* ignore */ }
+    }
     setSaved(true);
     setTimeout(() => setSaved(false), 2000);
   };

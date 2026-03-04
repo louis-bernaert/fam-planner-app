@@ -82,6 +82,7 @@ export async function GET(request: Request) {
       email: user.email,
       familyIds: user.memberships.map((m: { familyId: string }) => m.familyId),
       points: user.points,
+      preferences: user.preferences ?? {},
     };
 
     const userData = encodeURIComponent(JSON.stringify(cleanUser));

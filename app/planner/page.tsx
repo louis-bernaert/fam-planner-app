@@ -8,6 +8,7 @@ import styles from "./page.module.css";
 import { Icon } from "../components/Icon";
 import { useTranslation } from "../components/LanguageProvider";
 import { solveMILP } from "@/lib/autoAssignSolver";
+import { resolvePreferences, writePreferencesToLocalStorage, readPreferencesFromLocalStorage, savePreferencesToDB, dispatchPreferencesUpdated } from "../lib/userPreferences";
 import type { SolverTaskDay, SolverCostEntry, SolverRotationEntry, SolverMember } from "@/lib/autoAssignSolver.types";
 
 type Theme = 'light' | 'dark' | 'auto';
@@ -2234,6 +2235,17 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
         setAuthMessage(`${t.planner.loggedInAs} ${user.name}.`);
         window.localStorage.setItem("sessionUser", JSON.stringify(user));
         window.history.replaceState({}, "", "/planner");
+
+        // Apply preferences from DB (or lazy-migrate localStorage prefs)
+        const dbPrefs = user.preferences;
+        if (dbPrefs && Object.keys(dbPrefs).length > 0) {
+          const resolved = resolvePreferences(dbPrefs);
+          writePreferencesToLocalStorage(resolved);
+          dispatchPreferencesUpdated(resolved);
+        } else {
+          const local = readPreferencesFromLocalStorage();
+          savePreferencesToDB(user.id, local);
+        }
       } catch (e) {
         console.error("google auth parse", e);
         setAuthError(t.planner.googleError);
@@ -2714,6 +2726,22 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       setCurrentUser(parsed.id);
       setSelectedUser(parsed.id);
       if (parsed.familyIds?.[0]) setSelectedFamily(parsed.familyIds[0]);
+
+      // Fetch preferences from DB for cross-device sync
+      fetch(`/api/users/${parsed.id}/preferences`)
+        .then((r) => r.json())
+        .then((data) => {
+          if (data.preferences && Object.keys(data.preferences).length > 0) {
+            const resolved = resolvePreferences(data.preferences);
+            writePreferencesToLocalStorage(resolved);
+            dispatchPreferencesUpdated(resolved);
+          } else {
+            // Lazy migration: upload current localStorage prefs to DB
+            const local = readPreferencesFromLocalStorage();
+            savePreferencesToDB(parsed.id, local);
+          }
+        })
+        .catch(() => { /* ignore fetch errors on restore */ });
     } catch (e) {
       console.warn("session parse", e);
       window.localStorage.removeItem("sessionUser");
@@ -2752,6 +2780,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       setAuthMessage(t.planner.accountCreated);
       setAuthError("");
       window.localStorage.setItem("sessionUser", JSON.stringify(user));
+
+      // New account: upload current localStorage prefs to DB
+      const local = readPreferencesFromLocalStorage();
+      savePreferencesToDB(user.id, local);
     } catch (error) {
       console.error("signup", error);
       setAuthError(t.planner.networkError);
@@ -2785,6 +2817,17 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       setAuthError("");
       setAuthMessage(`${t.planner.loggedInAs} ${user.name}.`);
       window.localStorage.setItem("sessionUser", JSON.stringify(user));
+
+      // Apply preferences from DB (or lazy-migrate localStorage prefs)
+      const dbPrefs = user.preferences;
+      if (dbPrefs && Object.keys(dbPrefs).length > 0) {
+        const resolved = resolvePreferences(dbPrefs);
+        writePreferencesToLocalStorage(resolved);
+        dispatchPreferencesUpdated(resolved);
+      } else {
+        const local = readPreferencesFromLocalStorage();
+        savePreferencesToDB(user.id, local);
+      }
     } catch (error) {
       console.error("login", error);
       setAuthError(t.planner.networkError);
