@@ -4,6 +4,7 @@ export type UserPreferences = {
   accentColor: "blue" | "purple" | "green" | "orange" | "red" | "pink" | "teal";
   notif_freeTasks: boolean;
   notif_evalTasks: boolean;
+  onboardingCompleted: boolean;
 };
 
 export const DEFAULT_PREFERENCES: UserPreferences = {
@@ -12,6 +13,7 @@ export const DEFAULT_PREFERENCES: UserPreferences = {
   accentColor: "blue",
   notif_freeTasks: true,
   notif_evalTasks: true,
+  onboardingCompleted: false,
 };
 
 export function resolvePreferences(
@@ -35,6 +37,7 @@ export function readPreferencesFromLocalStorage(): UserPreferences {
     accentColor: accentColor && ["blue", "purple", "green", "orange", "red", "pink", "teal"].includes(accentColor) ? accentColor as UserPreferences["accentColor"] : "blue",
     notif_freeTasks: notifFree !== "false",
     notif_evalTasks: notifEval !== "false",
+    onboardingCompleted: localStorage.getItem("onboardingCompleted") === "true",
   };
 }
 
@@ -44,6 +47,7 @@ export function writePreferencesToLocalStorage(prefs: UserPreferences): void {
   localStorage.setItem("accentColor", prefs.accentColor);
   localStorage.setItem("notif_freeTasks", String(prefs.notif_freeTasks));
   localStorage.setItem("notif_evalTasks", String(prefs.notif_evalTasks));
+  localStorage.setItem("onboardingCompleted", String(prefs.onboardingCompleted));
 }
 
 export async function savePreferencesToDB(

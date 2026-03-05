@@ -465,6 +465,7 @@ export const fr = {
     points: "Points",
     notifications: "Notifications",
     language: "Langue",
+    guide: "Guide",
     // Display settings
     displaySettings: "Réglages affichage",
     accentColor: "Couleur d'accent",
@@ -603,5 +604,48 @@ export const fr = {
     passwordChanged: "Mot de passe modifié",
     passwordChangedDesc: "Votre mot de passe a été réinitialisé avec succès.",
     loginBtn: "Se connecter",
+  },
+  onboarding: {
+    skip: "Passer",
+    next: "Suivant",
+    previous: "Précédent",
+    done: "C'est parti !",
+    stepOf: "sur",
+    welcome: {
+      title: "Bienvenue sur Fam'Planner !",
+      description: "Organisez les tâches de votre foyer en toute équité. Ce guide vous montre l'essentiel en quelques écrans.",
+    },
+    family: {
+      title: "Créez ou rejoignez une famille",
+      description: "Allez dans Paramètres > Famille pour créer votre foyer ou rejoindre un foyer existant grâce à un code d'invitation.",
+    },
+    tabs: {
+      title: "Découvrez les 5 onglets",
+      description: "Accueil, Planificateur, Points, Tâches et Calendrier. Chaque onglet a un rôle précis pour organiser votre semaine.",
+    },
+    tasks: {
+      title: "Créez vos tâches",
+      description: "Ajoutez des tâches libres ou évaluées avec durée et pénibilité. Chaque membre évalue chaque tâche selon son ressenti.",
+    },
+    planner: {
+      title: "Planifiez la semaine",
+      description: "Inscrivez-vous manuellement aux tâches ou lancez l'auto-attribution pour une répartition équitable et intelligente.",
+    },
+    points: {
+      title: "Points et classement",
+      description: "Suivez les points gagnés, les objectifs hebdomadaires et le classement familial. L'équité devient mesurable !",
+    },
+    calendar: {
+      title: "Calendrier et indisponibilités",
+      description: "Synchronisez vos calendriers iCal et indiquez vos absences pour éviter les conflits lors de l'attribution.",
+    },
+    installIos: {
+      title: "Installez l'app sur iPhone",
+      description: "Appuyez sur le bouton Partager, puis \"Sur l'écran d'accueil\". L'app s'ouvre en plein écran comme une vraie application !",
+    },
+    ready: {
+      title: "Vous êtes prêt !",
+      description: "Commencez maintenant en créant votre famille ou en rejoignant un foyer existant. Bonne organisation !",
+    },
   },
 };

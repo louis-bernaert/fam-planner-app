@@ -465,6 +465,7 @@ export const en = {
     points: "Points",
     notifications: "Notifications",
     language: "Language",
+    guide: "Guide",
     // Display settings
     displaySettings: "Display settings",
     accentColor: "Accent color",
@@ -603,5 +604,48 @@ export const en = {
     passwordChanged: "Password changed",
     passwordChangedDesc: "Your password has been successfully reset.",
     loginBtn: "Log in",
+  },
+  onboarding: {
+    skip: "Skip",
+    next: "Next",
+    previous: "Previous",
+    done: "Let's go!",
+    stepOf: "of",
+    welcome: {
+      title: "Welcome to Fam'Planner!",
+      description: "Organize your household chores fairly. This guide shows you the essentials in a few screens.",
+    },
+    family: {
+      title: "Create or join a family",
+      description: "Go to Settings > Family to create your household or join an existing one with an invite code.",
+    },
+    tabs: {
+      title: "Discover the 5 tabs",
+      description: "Home, Planner, Points, Tasks, and Calendar. Each tab has a specific role to organize your week.",
+    },
+    tasks: {
+      title: "Create your tasks",
+      description: "Add free or evaluated tasks with duration and difficulty. Each member rates every task based on their own perception.",
+    },
+    planner: {
+      title: "Plan the week",
+      description: "Sign up for tasks manually or launch auto-assign for a fair and smart distribution.",
+    },
+    points: {
+      title: "Points and leaderboard",
+      description: "Track earned points, weekly goals, and the family leaderboard. Equity becomes measurable!",
+    },
+    calendar: {
+      title: "Calendar and unavailabilities",
+      description: "Sync your iCal calendars and indicate absences to avoid conflicts during assignment.",
+    },
+    installIos: {
+      title: "Install the app on iPhone",
+      description: "Tap the Share button, then \"Add to Home Screen\". The app opens fullscreen like a native app!",
+    },
+    ready: {
+      title: "You're all set!",
+      description: "Start now by creating your family or joining an existing household. Happy organizing!",
+    },
   },
 };

@@ -6,9 +6,11 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import styles from "./page.module.css";
 import { Icon } from "../components/Icon";
+
 import { useTranslation } from "../components/LanguageProvider";
 import { solveMILP } from "@/lib/autoAssignSolver";
 import { resolvePreferences, writePreferencesToLocalStorage, readPreferencesFromLocalStorage, savePreferencesToDB, dispatchPreferencesUpdated } from "../lib/userPreferences";
+import { OnboardingGuide } from "../components/OnboardingGuide";
 import type { SolverTaskDay, SolverCostEntry, SolverRotationEntry, SolverMember } from "@/lib/autoAssignSolver.types";
 
 type Theme = 'light' | 'dark' | 'auto';
@@ -218,6 +220,7 @@ export default function PlannerPage() {
   const [authMessage, setAuthMessage] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [showSignupPassword, setShowSignupPassword] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   const [forgotEmail, setForgotEmail] = useState("");
   const [forgotLoading, setForgotLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"monespace" | "taches" | "dispos" | "planificateur" | "points">("monespace");
@@ -2784,6 +2787,9 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       // New account: upload current localStorage prefs to DB
       const local = readPreferencesFromLocalStorage();
       savePreferencesToDB(user.id, local);
+
+      // Show onboarding guide for new accounts
+      setShowOnboarding(true);
     } catch (error) {
       console.error("signup", error);
       setAuthError(t.planner.networkError);
@@ -7773,6 +7779,10 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             </div>
           </div>
         </div>
+      )}
+
+      {showOnboarding && (
+        <OnboardingGuide onComplete={() => setShowOnboarding(false)} />
       )}
     </main>
   );
