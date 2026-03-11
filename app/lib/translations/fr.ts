@@ -613,39 +613,35 @@ export const fr = {
     stepOf: "sur",
     welcome: {
       title: "Bienvenue sur Fam'Planner !",
-      description: "Organisez les tâches de votre foyer en toute équité. Ce guide vous montre l'essentiel en quelques écrans.",
-    },
-    family: {
-      title: "Créez ou rejoignez une famille",
-      description: "Allez dans Paramètres > Famille pour créer votre foyer ou rejoindre un foyer existant grâce à un code d'invitation.",
+      description: "On vous fait visiter en quelques secondes. Suivez le guide !",
     },
     tabs: {
-      title: "Découvrez les 5 onglets",
-      description: "Accueil, Planificateur, Points, Tâches et Calendrier. Chaque onglet a un rôle précis pour organiser votre semaine.",
+      title: "Vos 5 onglets",
+      description: "Accueil, Planificateur, Points, Tâches et Calendrier. Tout se gère depuis cette barre.",
+    },
+    settings: {
+      title: "Paramètres",
+      description: "Créez ou rejoignez une famille ici pour commencer à organiser vos tâches.",
     },
     tasks: {
-      title: "Créez vos tâches",
-      description: "Ajoutez des tâches libres ou évaluées avec durée et pénibilité. Chaque membre évalue chaque tâche selon son ressenti.",
+      title: "Tâches",
+      description: "Créez vos tâches ici : libres ou évaluées, avec durée et pénibilité.",
     },
     planner: {
-      title: "Planifiez la semaine",
-      description: "Inscrivez-vous manuellement aux tâches ou lancez l'auto-attribution pour une répartition équitable et intelligente.",
+      title: "Planificateur",
+      description: "Gérez la semaine : inscrivez-vous aux tâches ou lancez l'auto-attribution intelligente.",
     },
     points: {
-      title: "Points et classement",
-      description: "Suivez les points gagnés, les objectifs hebdomadaires et le classement familial. L'équité devient mesurable !",
-    },
-    calendar: {
-      title: "Calendrier et indisponibilités",
-      description: "Synchronisez vos calendriers iCal et indiquez vos absences pour éviter les conflits lors de l'attribution.",
+      title: "Points",
+      description: "Suivez les points gagnés et le classement familial. L'équité devient mesurable !",
     },
     installIos: {
       title: "Installez l'app sur iPhone",
-      description: "Appuyez sur le bouton Partager, puis \"Sur l'écran d'accueil\". L'app s'ouvre en plein écran comme une vraie application !",
+      description: "Appuyez sur le bouton Partager, puis \"Sur l'écran d'accueil\". L'app s'ouvre en plein écran !",
     },
     ready: {
       title: "Vous êtes prêt !",
-      description: "Commencez maintenant en créant votre famille ou en rejoignant un foyer existant. Bonne organisation !",
+      description: "Commencez par créer ou rejoindre une famille dans les paramètres. Bonne organisation !",
     },
   },
 };

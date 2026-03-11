@@ -1,17 +1,14 @@
 "use client";
 
-import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import styles from "./settings.module.css";
 import Icon from "../components/Icon";
 import { useTranslation } from "../components/LanguageProvider";
-import { OnboardingGuide } from "../components/OnboardingGuide";
 
 export default function SettingsPage() {
   const router = useRouter();
   const { t } = useTranslation();
-  const [showOnboarding, setShowOnboarding] = useState(false);
 
   const handleLogout = () => {
     window.localStorage.removeItem("sessionUser");
@@ -77,7 +74,7 @@ export default function SettingsPage() {
           <span className={styles.gridLabel}>{t.settings.language}</span>
         </Link>
 
-        <button onClick={() => setShowOnboarding(true)} className={styles.gridCard}>
+        <button onClick={() => router.push("/planner?guide=true")} className={styles.gridCard}>
           <div className={styles.gridIcon}>
             <Icon name="lightbulb" size={24} />
           </div>
@@ -90,10 +87,6 @@ export default function SettingsPage() {
           {t.common.logout}
         </button>
       </div>
-
-      {showOnboarding && (
-        <OnboardingGuide onComplete={() => setShowOnboarding(false)} />
-      )}
     </div>
   );
 }

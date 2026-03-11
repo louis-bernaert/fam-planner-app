@@ -613,39 +613,35 @@ export const en = {
     stepOf: "of",
     welcome: {
       title: "Welcome to Fam'Planner!",
-      description: "Organize your household chores fairly. This guide shows you the essentials in a few screens.",
-    },
-    family: {
-      title: "Create or join a family",
-      description: "Go to Settings > Family to create your household or join an existing one with an invite code.",
+      description: "Let us show you around in a few seconds. Follow the guide!",
     },
     tabs: {
-      title: "Discover the 5 tabs",
-      description: "Home, Planner, Points, Tasks, and Calendar. Each tab has a specific role to organize your week.",
+      title: "Your 5 tabs",
+      description: "Home, Planner, Points, Tasks, and Calendar. Everything is managed from this bar.",
+    },
+    settings: {
+      title: "Settings",
+      description: "Create or join a family here to start organizing your tasks.",
     },
     tasks: {
-      title: "Create your tasks",
-      description: "Add free or evaluated tasks with duration and difficulty. Each member rates every task based on their own perception.",
+      title: "Tasks",
+      description: "Create your tasks here: free or evaluated, with duration and difficulty.",
     },
     planner: {
-      title: "Plan the week",
-      description: "Sign up for tasks manually or launch auto-assign for a fair and smart distribution.",
+      title: "Planner",
+      description: "Manage the week: sign up for tasks or launch the smart auto-assign.",
     },
     points: {
-      title: "Points and leaderboard",
-      description: "Track earned points, weekly goals, and the family leaderboard. Equity becomes measurable!",
-    },
-    calendar: {
-      title: "Calendar and unavailabilities",
-      description: "Sync your iCal calendars and indicate absences to avoid conflicts during assignment.",
+      title: "Points",
+      description: "Track earned points and the family leaderboard. Equity becomes measurable!",
     },
     installIos: {
       title: "Install the app on iPhone",
-      description: "Tap the Share button, then \"Add to Home Screen\". The app opens fullscreen like a native app!",
+      description: "Tap the Share button, then \"Add to Home Screen\". The app opens fullscreen!",
     },
     ready: {
       title: "You're all set!",
-      description: "Start now by creating your family or joining an existing household. Happy organizing!",
+      description: "Start by creating or joining a family in settings. Happy organizing!",
     },
   },
 };

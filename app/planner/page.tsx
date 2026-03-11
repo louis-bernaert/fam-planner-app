@@ -2225,6 +2225,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
     if (authParam === "signup") setAuthView("signup");
     if (authParam === "login") setAuthView("login");
 
+    // Handle guide relaunch from settings
+    const guideParam = searchParams?.get("guide");
+    if (guideParam === "true") {
+      setShowOnboarding(true);
+      window.history.replaceState({}, "", "/planner");
+    }
+
     // Handle Google OAuth callback
     const googleAuth = searchParams?.get("googleAuth");
     if (googleAuth) {
@@ -5901,7 +5908,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
                 <button className={styles.mobileIconBtn} onClick={() => setShowSuggestionModal(true)} title={t.planner.suggestIdea}>
                   <Icon name="lightbulb" size={20} />
                 </button>
-                <Link href="/settings" className={styles.mobileIconBtn} title={t.common.settings}>
+                <Link href="/settings" className={styles.mobileIconBtn} title={t.common.settings} data-onboarding="settings-btn">
                   <Icon name="gear" size={20} />
                 </Link>
               </div>
@@ -7007,12 +7014,13 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
               )}
             </div>
 
-            <nav className={styles.bottomNav}>
+            <nav className={styles.bottomNav} data-onboarding="tabbar">
               {tabs.map((tab) => (
                 <button
                   key={tab.id}
                   className={`${styles.bottomNavItem} ${activeTab === tab.id ? styles.bottomNavItemActive : ''}`}
                   onClick={() => setActiveTab(tab.id)}
+                  data-onboarding={`tab-${tab.id}`}
                 >
                   <Icon name={tab.icon} size={22} />
                   <span>{tab.shortLabel}</span>
@@ -7398,19 +7406,20 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
             <Icon name="lightbulb" size={18} />
             <span className={styles.themeLabel}>{t.planner.idea}</span>
           </button>
-          <Link href="/settings" className={styles.settingsLink} title={t.common.settings}>
+          <Link href="/settings" className={styles.settingsLink} title={t.common.settings} data-onboarding="settings-btn">
             <Icon name="gear" size={18} />
           </Link>
           {currentUserEntity && <span className={styles.userChip}>{currentUserEntity.name}</span>}
         </div>
       </header>
 
-      <nav className={styles.tabbar}>
+      <nav className={styles.tabbar} data-onboarding="tabbar">
         {tabs.map((tab) => (
           <button
             key={tab.id}
             className={activeTab === tab.id ? styles.tabButtonActive : styles.tabButton}
             onClick={() => setActiveTab(tab.id)}
+            data-onboarding={`tab-${tab.id}`}
           >
             {tab.label}
           </button>
@@ -7782,7 +7791,7 @@ const [taskAssignments, setTaskAssignments] = useState<Record<string, { date: st
       )}
 
       {showOnboarding && (
-        <OnboardingGuide onComplete={() => setShowOnboarding(false)} />
+        <OnboardingGuide onComplete={() => setShowOnboarding(false)} onNavigateTab={(tab) => setActiveTab(tab as typeof activeTab)} />
       )}
     </main>
   );
